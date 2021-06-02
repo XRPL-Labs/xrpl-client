@@ -52,3 +52,21 @@ Now the `dist/browser.js` file will exist, for you to use in a browser.
 Alternatively you can get a [prebuilt](https://cdn.jsdelivr.net/gh/XRPL-Labs/xrpl-client@main/dist/browser.js) / [prebuilt & minified](https://cdn.jsdelivr.net/gh/XRPL-Labs/xrpl-client@main/dist/browser.min.js) version from Github.
 
 Sample: [https://jsfiddle.net/WietseWind/p4cd37hf](https://jsfiddle.net/WietseWind/p4cd37hf/)
+
+### Migrating from `rippled-ws-client`
+
+1. The constructor doesn't return a promise with the connection: the constructed object passes on your messages. So if you need to wait for a live connection: use `await TheObject.ready()` and then refer to `TheObject`:
+
+```javascript
+// Old:
+//    new RippledWsClient('wss://testnet.xrpl-labs.com').then(Connection => { ... })
+// New:
+const Connection = new RippledWsClient('wss://testnet.xrpl-labs.com')
+Connection.ready().then(() => {
+```
+
+3. When used in combination with `rippled-ws-client-sign` (please use `xrpl-accountlib`) you need to wrap the class:
+
+```javascript
+class RippledWsClient extends XrplClient { } // Then use RippledWsClient
+```
