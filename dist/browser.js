@@ -2999,15 +2999,19 @@ class XrplClient extends events_1.EventEmitter {
                 this.lastContact = new Date();
                 if ((_a = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _a === void 0 ? void 0 : _a._WsClient) {
                     // Got response on a command, process accordingly
-                    const matchingCall = this.pendingCalls.filter((call) => {
+                    const matchingCall = [
+                        ...this.pendingCalls,
+                        ...this.subscriptions,
+                    ].filter((call) => {
                         var _a;
                         return call.id === ((_a = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _a === void 0 ? void 0 : _a._WsClient);
                     });
                     if (matchingCall.length === 1) {
                         const internalServerInfoCall = String(((_d = (_c = (_b = matchingCall[0]) === null || _b === void 0 ? void 0 : _b.request) === null || _c === void 0 ? void 0 : _c.id) === null || _d === void 0 ? void 0 : _d._Request) || "").split("@")[0] === "_WsClient_Internal_ServerInfo";
-                        matchingCall[0].promiseCallables.resolve(Object.assign(messageJson, {
+                        Object.assign(messageJson, {
                             id: (_e = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _e === void 0 ? void 0 : _e._Request,
-                        }));
+                        });
+                        matchingCall[0].promiseCallables.resolve((messageJson === null || messageJson === void 0 ? void 0 : messageJson.result) || messageJson);
                         this.pendingCalls.splice(this.pendingCalls.indexOf(matchingCall[0]), 1);
                         if (!internalServerInfoCall) {
                             log("» Pending Call Length", this.pendingCalls.length);
@@ -3041,6 +3045,7 @@ class XrplClient extends events_1.EventEmitter {
                 log("  > Process call", call.id, call.request.command);
             }
             try {
+                // log(call.request);
                 this.connection.send(JSON.stringify(call.request));
             }
             catch (e) {
@@ -3115,7 +3120,27 @@ class XrplClient extends events_1.EventEmitter {
         this.on("__WsClient_close", close);
         this.on("flush", flush);
         this.on("reconnect", connect);
+        // setTimeout(() => {
         this.connection = connect();
+        // }, 2000);
+    }
+    ready() {
+        return new Promise((resolve, reject) => {
+            const state = this.getState();
+            if (state.online &&
+                state.secLastContact &&
+                state.secLastContact < 10 &&
+                state.ledger.last) {
+                // We're good
+                resolve(this);
+            }
+            else {
+                this.on("ledger", () => {
+                    // Let's wait to make sure we're really connected
+                    resolve(this);
+                });
+            }
+        });
     }
     send(call) {
         assert_1.default(!this.closed, "Client in closed state");

@@ -261,19 +261,25 @@ export class XrplClient extends EventEmitter {
 
         if (messageJson?.id?._WsClient) {
           // Got response on a command, process accordingly
-          const matchingCall = this.pendingCalls.filter((call) => {
+          const matchingCall = [
+            ...this.pendingCalls,
+            ...this.subscriptions,
+          ].filter((call) => {
             return call.id === messageJson?.id?._WsClient;
           });
+
           if (matchingCall.length === 1) {
             const internalServerInfoCall =
               String(matchingCall[0]?.request?.id?._Request || "").split(
                 "@"
               )[0] === "_WsClient_Internal_ServerInfo";
 
+            Object.assign(messageJson, {
+              id: messageJson?.id?._Request,
+            });
+
             matchingCall[0].promiseCallables.resolve(
-              Object.assign(messageJson, {
-                id: messageJson?.id?._Request,
-              })
+              messageJson?.result || messageJson
             );
 
             this.pendingCalls.splice(
@@ -312,6 +318,7 @@ export class XrplClient extends EventEmitter {
         log("  > Process call", call.id, call.request.command);
       }
       try {
+        // log(call.request);
         this.connection.send(JSON.stringify(call.request));
       } catch (e) {
         logWarning("Process (send to uplink) error", e.message);
@@ -407,13 +414,19 @@ export class XrplClient extends EventEmitter {
 
   ready(): Promise<XrplClient> {
     return new Promise((resolve, reject) => {
-      if (this.getState().online) {
+      const state = this.getState();
+      if (
+        state.online &&
+        state.secLastContact &&
+        state.secLastContact < 10 &&
+        state.ledger.last
+      ) {
+        // We're good
         resolve(this);
       } else {
-        this.on("state", (state) => {
-          if (state.online) {
-            resolve(this);
-          }
+        this.on("ledger", () => {
+          // Let's wait to make sure we're really connected
+          resolve(this);
         });
       }
     });

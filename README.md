@@ -7,7 +7,7 @@ Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket clie
 #### Methods:
 
 - `send({ command: "..."})` » `Promise<CallResponse | AnyJson>` » Send a `comand` to the connected XRPL node.
-- `ready()` » `Promise<void>` » fires when you're connected. You can fire commands before that, they will be buffered.
+- `ready()` » `Promise<self>` » fires when you're fully connected. While the `state` event (and `getState()` method) only return the WebSocket online state, `ready()` will only return (async) if the first ledger data has been received and the last ledger index is known.
 - `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
 - close() » `void` » Fully close the entire object (can't be used again).
 
