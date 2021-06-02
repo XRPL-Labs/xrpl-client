@@ -1,6 +1,6 @@
 {
   "name": "xrpl-client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Connect to the XRP Ledger using websockets",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -9,12 +9,12 @@
     "clean": "rm -rf dist",
     "build": "tsc",
     "watch": "tsc -w",
-    "dev": "clear && npm run build && DEBUG=xrplwsclient* nodemon --watch dist dist/samples/sample.js",
+    "dev": "clear && npm run build && DEBUG=xrplclient* nodemon --watch dist dist/samples/sample.js",
     "inspect": "clear && npm run build && node --inspect dist/samples/sample.js",
     "browserify": "browserify -r ./dist/src/index.js:xrpl-client -o dist/browser.js && npm run minify",
     "minify": "cat dist/browser.js | terser --compress --mangle > dist/browser.min.js",
-    "test": "DEBUG=xrplwsclient:tests* jest --ci",
-    "test-verbose": "DEBUG=xrplwsclient:tests* jest --ci --verbose",
+    "test": "DEBUG=xrplclient:tests* jest --ci",
+    "test-verbose": "DEBUG=xrplclient:tests* jest --ci --verbose",
     "lint": "eslint"
   },
   "files": [
@@ -41,12 +41,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com:XRPL-Labs/XrpldWsClient.git"
+    "url": "git://github.com:XRPL-Labs/xrpl-client.git"
   },
   "bugs": {
-    "url": "https://github.com/XRPL-Labs/XrpldWsClient/issues"
+    "url": "https://github.com/XRPL-Labs/xrpl-client/issues"
   },
-  "homepage": "https://github.com/XRPL-Labs/XrpldWsClient/#readme",
+  "homepage": "https://github.com/XRPL-Labs/xrpl-client/#readme",
   "license": "MIT",
   "readmeFilename": "README.md",
   "keywords": [

@@ -2793,7 +2793,7 @@ module.exports={
   "license": "Apache-2.0"
 }
 
-},{}],"xrpld-ws-client":[function(require,module,exports){
+},{}],"xrpl-client":[function(require,module,exports){
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -2809,17 +2809,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WsClient = void 0;
+exports.XrplClient = void 0;
 const assert_1 = __importDefault(require("assert"));
 const events_1 = require("events");
 const debug_1 = require("debug");
 const websocket_1 = require("websocket");
 __exportStar(require("./types"), exports);
-const log = debug_1.debug("xrplwsclient");
+const log = debug_1.debug("xrplclient");
 const logWarning = log.extend("warning");
 const logMessage = log.extend("message");
 const logNodeInfo = log.extend("node");
-class WsClient extends events_1.EventEmitter {
+class XrplClient extends events_1.EventEmitter {
     constructor(endpoint = "wss://xrplcluster.com", options) {
         super();
         this.connectBackoff = 1000 / 1.2;
@@ -3218,6 +3218,6 @@ class WsClient extends events_1.EventEmitter {
         this.emit("__WsClient_close");
     }
 }
-exports.WsClient = WsClient;
+exports.XrplClient = XrplClient;
 
 },{"./types":1,"assert":2,"debug":6,"events":9,"websocket":13}]},{},[]);

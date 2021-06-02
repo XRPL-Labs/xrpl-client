@@ -20,7 +20,7 @@ import {
 
 export * from "./types";
 
-const log = Debug("xrplwsclient");
+const log = Debug("xrplclient");
 
 const logWarning = log.extend("warning");
 const logMessage = log.extend("message");
