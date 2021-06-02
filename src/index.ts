@@ -26,7 +26,7 @@ const logWarning = log.extend("warning");
 const logMessage = log.extend("message");
 const logNodeInfo = log.extend("node");
 
-export class WsClient extends EventEmitter {
+export class XrplClient extends EventEmitter {
   private connectBackoff: number = 1000 / 1.2;
   private closed: boolean = false;
   private uplinkReady: boolean = false;
