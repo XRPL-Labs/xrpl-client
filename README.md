@@ -2,25 +2,41 @@
 
 ### XRP Ledger WebSocket Client, npm: `xrpl-client`
 
-...
+Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket client. For in node & the browser.
 
-- Auto reconnecting, etc.
+#### Methods:
 
-- Emits:
+- `send({ command: "..."})` » `Promise<CallResponse | AnyJson>` » Send a `comand` to the connected XRPL node.
+- `ready()` » `Promise<void>` » fires when you're connected. You can fire commands before that, they will be buffered.
+- `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
+- close() » `void` » Fully close the entire object (can't be used again).
 
-- message
-  ledger
-  path
-  transaction
-  validation
-- retry
-- close
-- reconnect
+#### Events emitted:
+
+- `state` (the state of the connection changed from online to offline or vice versa)
+- `message` (all messages, even if duplicate of the ones below)
+- `ledger` (a ledger closed)
+- `path` (async `path_find` response)
+- `transaction`
+- `validation`
+- `retry` (new connection attempt)
+- `close` (upstream closed the connection)
+- `reconnect` (reconnecting, after connected: `state`)
 
 ### Syntax
 
 ```javascript
-// Todo
+import { XrplClient } from "xrpl-client";
+const client = new XrplClient("wss://xrplcluster.com");
+
+// await client.ready();
+
+const serverInfo = await client.send({ command: "server_info" });
+console.log({ serverInfo });
+
+client.on("ledger", (ledger) => {
+  console.log("Ledger", ledger);
+});
 ```
 
 ### Use in the browser

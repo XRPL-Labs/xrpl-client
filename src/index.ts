@@ -400,7 +400,23 @@ export class XrplClient extends EventEmitter {
     this.on("flush", flush);
     this.on("reconnect", connect);
 
+    // setTimeout(() => {
     this.connection = connect();
+    // }, 2000);
+  }
+
+  ready(): Promise<XrplClient> {
+    return new Promise((resolve, reject) => {
+      if (this.getState().online) {
+        resolve(this);
+      } else {
+        this.on("state", (state) => {
+          if (state.online) {
+            resolve(this);
+          }
+        });
+      }
+    });
   }
 
   send(call: Call): Promise<CallResponse> {
