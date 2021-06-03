@@ -16,6 +16,7 @@ import {
   ServerInfoResponse,
   ConnectionState,
   ServerState,
+  SendOptions,
 } from "./types";
 
 export * from "./types";
@@ -32,7 +33,8 @@ export class XrplClient extends EventEmitter {
   private uplinkReady: boolean = false;
 
   private options: WsClientOptions = {
-    connectTimeout: 4,
+    connectAttemptTimeoutSeconds: 4,
+    assumeOfflineAfterSeconds: 30,
     // TODO:
     // maxPendingCalls: 100,
     // callTimeout: 20,
@@ -63,35 +65,83 @@ export class XrplClient extends EventEmitter {
       Object.assign(this.options, options);
     }
 
+    /**
+     * Alive timer
+     */
+    let livelinessCheck: ReturnType<typeof setTimeout>;
+    const alive = (): void => {
+      clearTimeout(livelinessCheck);
+      const seconds =
+        Number(this?.options?.assumeOfflineAfterSeconds || 30) * 1_000;
+      livelinessCheck = setTimeout(() => {
+        logWarning(
+          "----- CONNECTION TIMEOUT, NO LEDER INFO RECEIVED FOR ",
+          seconds,
+          "SECONDS -----"
+        );
+        try {
+          this.connection?.close();
+        } catch (e) {
+          //
+        }
+      }, seconds);
+    };
+    alive();
+
+    // setInterval(() => {
+    //   log("» Pending Call Length", this.pendingCalls.length);
+    // }, 5000);
+
     this.endpoint = endpoint.trim();
 
     log(`Initialized xrpld WebSocket Client`);
 
+    this.on("ledger", () => {
+      connectionReady();
+      alive();
+    });
+
     /**
-     * We're firing two commands when we're connected
+     * Important one
      */
+    const connectionReady = (): void => {
+      if (!this.uplinkReady) {
+        logNodeInfo("Connection ready, fire events");
 
-    this.send({
-      id: "_WsClient_Internal_Subscription",
-      command: "subscribe",
-      streams: ["ledger"],
-    });
-
-    this.send({
-      id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
-      command: "server_info",
-    });
+        this.connectBackoff = 1000 / 1.2;
+        this.uplinkReady = true;
+        this.emit("flush");
+        this.emit("state", this.getState());
+      }
+    };
 
     /**
      * WebSocket client event handlers
      */
-
     const WsOpen = (): void => {
       log("Connection opened :)");
-      this.connectBackoff = 1000 / 1.2;
-      this.uplinkReady = true;
-      this.emit("flush");
-      this.emit("state", this.getState());
+
+      /**
+       * We're firing two commands when we're connected
+       */
+      this.send(
+        {
+          id: "_WsClient_Internal_Subscription",
+          command: "subscribe",
+          streams: ["ledger"],
+        },
+        { sendIfNotReady: true, noReplayAfterReconnect: true }
+      );
+
+      this.send(
+        {
+          id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
+          command: "server_info",
+        },
+        { sendIfNotReady: true, noReplayAfterReconnect: true }
+      ).then(() => {
+        connectionReady();
+      });
 
       // setTimeout(() => {
       //   // this.connection.close();
@@ -105,10 +155,11 @@ export class XrplClient extends EventEmitter {
 
       this.connectBackoff = Math.min(
         Math.round(this.connectBackoff * 1.2),
-        this.options.connectTimeout * 1000
+        Number(this.options?.connectAttemptTimeoutSeconds || 4) * 1000
       );
 
       this.uplinkReady = false;
+      this.serverInfo = undefined;
 
       logWarning("Upstream/Websocket closed", event?.code, event?.reason);
       WsCleanup();
@@ -130,7 +181,6 @@ export class XrplClient extends EventEmitter {
 
     const handleServerInfo = (message: CallResponse): void => {
       if (message?.result?.info) {
-        // TODO: Handle, populate stats, emit pubkey_node
         const serverInfo = message as ServerInfoResponse;
         if (!this.serverInfo) {
           logNodeInfo("Connected, server_info:", {
@@ -195,6 +245,9 @@ export class XrplClient extends EventEmitter {
 
           this.emit("ledger", message);
 
+          /**
+           * Always request a server_info for a received ledger as well
+           */
           this.send({
             id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
             command: "server_info",
@@ -237,12 +290,17 @@ export class XrplClient extends EventEmitter {
               })
             );
           } else {
-            logMessage(`Handle <UNKNOWN> Async Message`, {
-              internalId: message?.id?._WsClient,
-              matchingSubscription,
-              type: message?.type,
-              message,
-            });
+            const isInternal =
+              message?.id?._Request &&
+              String(message.id._Request).match(/^_WsClient_Internal/);
+            if (!isInternal) {
+              logMessage(`Handle <UNKNOWN> Async Message`, {
+                internalId: message?.id?._WsClient,
+                matchingSubscription,
+                type: message?.type,
+                message,
+              });
+            }
           }
         }
       }
@@ -261,14 +319,17 @@ export class XrplClient extends EventEmitter {
 
         if (messageJson?.id?._WsClient) {
           // Got response on a command, process accordingly
-          const matchingCall = [
-            ...this.pendingCalls,
-            ...this.subscriptions,
-          ].filter((call) => {
+          const matchingSubscription = this.subscriptions.filter((call) => {
             return call.id === messageJson?.id?._WsClient;
           });
 
-          if (matchingCall.length === 1) {
+          const matchingCall = this.pendingCalls.filter((call) => {
+            return call.id === messageJson?.id?._WsClient;
+          });
+
+          if (matchingSubscription.length === 1) {
+            handleAsyncWsMessage(messageJson);
+          } else if (matchingCall.length === 1) {
             const internalServerInfoCall =
               String(matchingCall[0]?.request?.id?._Request || "").split(
                 "@"
@@ -277,6 +338,13 @@ export class XrplClient extends EventEmitter {
             Object.assign(messageJson, {
               id: messageJson?.id?._Request,
             });
+
+            if (
+              matchingCall[0].sendOptions?.timeoutSeconds &&
+              matchingCall[0].timeout
+            ) {
+              clearTimeout(matchingCall[0].timeout);
+            }
 
             matchingCall[0].promiseCallables.resolve(
               messageJson?.result || messageJson
@@ -309,6 +377,28 @@ export class XrplClient extends EventEmitter {
       logWarning("Upstream/Websocket error");
     };
 
+    const applyCallTimeout = (call: PendingCall): void => {
+      if (call?.sendOptions?.timeoutSeconds && !call?.timeout) {
+        Object.assign(call, {
+          timeout: setTimeout(async () => {
+            const didTimeout =
+              (await Promise.race([
+                call.promise,
+                Promise.resolve("_WsClient_Internal_CallResolved"),
+              ])) === "_WsClient_Internal_CallResolved";
+
+            if (didTimeout) {
+              call.promiseCallables.reject(
+                new Error(
+                  `Call timeout after ${call.sendOptions?.timeoutSeconds} seconds`
+                )
+              );
+            }
+          }, Number(call.sendOptions.timeoutSeconds) * 1_000),
+        });
+      }
+    };
+
     const process = (call: PendingCall): void => {
       // const isSubscription = call.request.command === "subscribe";
       if (
@@ -320,6 +410,10 @@ export class XrplClient extends EventEmitter {
       try {
         // log(call.request);
         this.connection.send(JSON.stringify(call.request));
+        if (call?.sendOptions?.timeoutStartsWhenOnline) {
+          logWarning("APPLY TIMEOUT ONLY AFTER GOING ONLINE");
+          applyCallTimeout(call);
+        }
       } catch (e) {
         logWarning("Process (send to uplink) error", e.message);
       }
@@ -334,10 +428,18 @@ export class XrplClient extends EventEmitter {
           `Call ${call.id}: ${call.request.command}\n   > `,
           this.uplinkReady
             ? "Uplink ready, pass immediately"
+            : call?.sendOptions?.sendIfNotReady
+            ? "Uplink not flagged as ready yet, but `sendIfNotReady` = true, so go ahead"
             : "Uplink not ready, wait for flush"
         );
       }
-      if (this.uplinkReady) {
+
+      if (!call?.sendOptions?.timeoutStartsWhenOnline) {
+        logWarning("APPLY TIMEOUT NO MATTER ONLINE/OFFLINE STATE");
+        applyCallTimeout(call);
+      }
+
+      if (this.uplinkReady || call?.sendOptions?.sendIfNotReady) {
         process(call);
       }
     };
@@ -375,7 +477,6 @@ export class XrplClient extends EventEmitter {
 
     const WsCleanup = (): void => {
       log("Cleanup");
-      // TODO:
       (this.connection as any).removeEventListener("open", WsOpen);
       (this.connection as any).removeEventListener("message", WsMessage);
       (this.connection as any).removeEventListener("error", WsError);
@@ -432,7 +533,7 @@ export class XrplClient extends EventEmitter {
     });
   }
 
-  send(call: Call): Promise<CallResponse> {
+  send(call: Call, sendOptions: SendOptions = {}): Promise<AnyJson> {
     assert(!this.closed, "Client in closed state");
     assert(
       typeof call === "object" && call,
@@ -462,12 +563,39 @@ export class XrplClient extends EventEmitter {
       }),
       promise,
       promiseCallables,
+      sendOptions,
     };
 
     const isSubscription =
-      pendingCall.request.command === "subscribe" ||
-      pendingCall.request.command === "unsubscribe" ||
-      pendingCall.request.command === "path_find";
+      (pendingCall.request.command === "subscribe" ||
+        pendingCall.request.command === "unsubscribe" ||
+        pendingCall.request.command === "path_find") &&
+      !sendOptions?.noReplayAfterReconnect;
+
+    if (
+      pendingCall.request?.command === "unsubscribe" &&
+      Array.isArray(pendingCall.request?.streams) &&
+      pendingCall.request?.streams.indexOf("ledger") > -1
+    ) {
+      pendingCall.request.streams.splice(
+        pendingCall.request.streams.indexOf("ledger"),
+        1
+      );
+
+      if (
+        pendingCall.request.streams.length === 0 &&
+        Object.keys(pendingCall.request).filter(
+          (key) => key !== "id" && key !== "streams" && key !== "command"
+        ).length === 0
+      ) {
+        // Unsubscribing (just) streams
+        return Promise.reject(
+          new Error(
+            "Unsubscribing from (just) the ledger stream is not allowed"
+          )
+        );
+      }
+    }
 
     if (
       String(call?.id || "").split("@")[0] !== "_WsClient_Internal_ServerInfo"

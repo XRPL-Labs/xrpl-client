@@ -2805,6 +2805,15 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -2826,7 +2835,8 @@ class XrplClient extends events_1.EventEmitter {
         this.closed = false;
         this.uplinkReady = false;
         this.options = {
-            connectTimeout: 4,
+            connectAttemptTimeoutSeconds: 4,
+            assumeOfflineAfterSeconds: 30,
             // TODO:
             // maxPendingCalls: 100,
             // callTimeout: 20,
@@ -2844,39 +2854,78 @@ class XrplClient extends events_1.EventEmitter {
         if (options) {
             Object.assign(this.options, options);
         }
+        /**
+         * Alive timer
+         */
+        let livelinessCheck;
+        const alive = () => {
+            var _a;
+            clearTimeout(livelinessCheck);
+            const seconds = Number(((_a = this === null || this === void 0 ? void 0 : this.options) === null || _a === void 0 ? void 0 : _a.assumeOfflineAfterSeconds) || 30) * 1000;
+            livelinessCheck = setTimeout(() => {
+                var _a;
+                logWarning("----- CONNECTION TIMEOUT, NO LEDER INFO RECEIVED FOR ", seconds, "SECONDS -----");
+                try {
+                    (_a = this.connection) === null || _a === void 0 ? void 0 : _a.close();
+                }
+                catch (e) {
+                    //
+                }
+            }, seconds);
+        };
+        alive();
+        // setInterval(() => {
+        //   log("» Pending Call Length", this.pendingCalls.length);
+        // }, 5000);
         this.endpoint = endpoint.trim();
         log(`Initialized xrpld WebSocket Client`);
+        this.on("ledger", () => {
+            connectionReady();
+            alive();
+        });
         /**
-         * We're firing two commands when we're connected
+         * Important one
          */
-        this.send({
-            id: "_WsClient_Internal_Subscription",
-            command: "subscribe",
-            streams: ["ledger"],
-        });
-        this.send({
-            id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
-            command: "server_info",
-        });
+        const connectionReady = () => {
+            if (!this.uplinkReady) {
+                logNodeInfo("Connection ready, fire events");
+                this.connectBackoff = 1000 / 1.2;
+                this.uplinkReady = true;
+                this.emit("flush");
+                this.emit("state", this.getState());
+            }
+        };
         /**
          * WebSocket client event handlers
          */
         const WsOpen = () => {
             log("Connection opened :)");
-            this.connectBackoff = 1000 / 1.2;
-            this.uplinkReady = true;
-            this.emit("flush");
-            this.emit("state", this.getState());
+            /**
+             * We're firing two commands when we're connected
+             */
+            this.send({
+                id: "_WsClient_Internal_Subscription",
+                command: "subscribe",
+                streams: ["ledger"],
+            }, { sendIfNotReady: true, noReplayAfterReconnect: true });
+            this.send({
+                id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
+                command: "server_info",
+            }, { sendIfNotReady: true, noReplayAfterReconnect: true }).then(() => {
+                connectionReady();
+            });
             // setTimeout(() => {
             //   // this.connection.close();
             //   // (this.connection as any).removeEventListener("message", WsMessage);
             // }, 5000);
         };
         const WsClose = (event) => {
+            var _a;
             this.emit("close");
             this.emit("state", this.getState());
-            this.connectBackoff = Math.min(Math.round(this.connectBackoff * 1.2), this.options.connectTimeout * 1000);
+            this.connectBackoff = Math.min(Math.round(this.connectBackoff * 1.2), Number(((_a = this.options) === null || _a === void 0 ? void 0 : _a.connectAttemptTimeoutSeconds) || 4) * 1000);
             this.uplinkReady = false;
+            this.serverInfo = undefined;
             logWarning("Upstream/Websocket closed", event === null || event === void 0 ? void 0 : event.code, event === null || event === void 0 ? void 0 : event.reason);
             WsCleanup();
             if (!this.closed) {
@@ -2893,7 +2942,6 @@ class XrplClient extends events_1.EventEmitter {
         const handleServerInfo = (message) => {
             var _a, _b;
             if ((_a = message === null || message === void 0 ? void 0 : message.result) === null || _a === void 0 ? void 0 : _a.info) {
-                // TODO: Handle, populate stats, emit pubkey_node
                 const serverInfo = message;
                 if (!this.serverInfo) {
                     logNodeInfo("Connected, server_info:", {
@@ -2929,7 +2977,7 @@ class XrplClient extends events_1.EventEmitter {
             }
         };
         const handleAsyncWsMessage = (message) => {
-            var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
             if (((_a = message === null || message === void 0 ? void 0 : message.id) === null || _a === void 0 ? void 0 : _a._Request) !== "_WsClient_Internal_Subscription") {
                 this.emit("message", message);
                 if ((message === null || message === void 0 ? void 0 : message.type) === "ledgerClosed") {
@@ -2940,6 +2988,9 @@ class XrplClient extends events_1.EventEmitter {
                         reserveInc: Number(message === null || message === void 0 ? void 0 : message.reserve_inc) / 1000000 || null,
                     });
                     this.emit("ledger", message);
+                    /**
+                     * Always request a server_info for a received ledger as well
+                     */
                     this.send({
                         id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
                         command: "server_info",
@@ -2981,36 +3032,48 @@ class XrplClient extends events_1.EventEmitter {
                         }));
                     }
                     else {
-                        logMessage(`Handle <UNKNOWN> Async Message`, {
-                            internalId: (_j = message === null || message === void 0 ? void 0 : message.id) === null || _j === void 0 ? void 0 : _j._WsClient,
-                            matchingSubscription,
-                            type: message === null || message === void 0 ? void 0 : message.type,
-                            message,
-                        });
+                        const isInternal = ((_j = message === null || message === void 0 ? void 0 : message.id) === null || _j === void 0 ? void 0 : _j._Request) &&
+                            String(message.id._Request).match(/^_WsClient_Internal/);
+                        if (!isInternal) {
+                            logMessage(`Handle <UNKNOWN> Async Message`, {
+                                internalId: (_k = message === null || message === void 0 ? void 0 : message.id) === null || _k === void 0 ? void 0 : _k._WsClient,
+                                matchingSubscription,
+                                type: message === null || message === void 0 ? void 0 : message.type,
+                                message,
+                            });
+                        }
                     }
                 }
             }
         };
         const WsMessage = (message) => {
-            var _a, _b, _c, _d, _e;
+            var _a, _b, _c, _d, _e, _f;
             try {
                 assert_1.default(typeof message.data === "string", "Unexpected incoming WebSocket message data type");
                 const messageJson = JSON.parse(message.data);
                 this.lastContact = new Date();
                 if ((_a = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _a === void 0 ? void 0 : _a._WsClient) {
                     // Got response on a command, process accordingly
-                    const matchingCall = [
-                        ...this.pendingCalls,
-                        ...this.subscriptions,
-                    ].filter((call) => {
+                    const matchingSubscription = this.subscriptions.filter((call) => {
                         var _a;
                         return call.id === ((_a = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _a === void 0 ? void 0 : _a._WsClient);
                     });
-                    if (matchingCall.length === 1) {
+                    const matchingCall = this.pendingCalls.filter((call) => {
+                        var _a;
+                        return call.id === ((_a = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _a === void 0 ? void 0 : _a._WsClient);
+                    });
+                    if (matchingSubscription.length === 1) {
+                        handleAsyncWsMessage(messageJson);
+                    }
+                    else if (matchingCall.length === 1) {
                         const internalServerInfoCall = String(((_d = (_c = (_b = matchingCall[0]) === null || _b === void 0 ? void 0 : _b.request) === null || _c === void 0 ? void 0 : _c.id) === null || _d === void 0 ? void 0 : _d._Request) || "").split("@")[0] === "_WsClient_Internal_ServerInfo";
                         Object.assign(messageJson, {
                             id: (_e = messageJson === null || messageJson === void 0 ? void 0 : messageJson.id) === null || _e === void 0 ? void 0 : _e._Request,
                         });
+                        if (((_f = matchingCall[0].sendOptions) === null || _f === void 0 ? void 0 : _f.timeoutSeconds) &&
+                            matchingCall[0].timeout) {
+                            clearTimeout(matchingCall[0].timeout);
+                        }
                         matchingCall[0].promiseCallables.resolve((messageJson === null || messageJson === void 0 ? void 0 : messageJson.result) || messageJson);
                         this.pendingCalls.splice(this.pendingCalls.indexOf(matchingCall[0]), 1);
                         if (!internalServerInfoCall) {
@@ -3037,8 +3100,25 @@ class XrplClient extends events_1.EventEmitter {
         const WsError = (error) => {
             logWarning("Upstream/Websocket error");
         };
+        const applyCallTimeout = (call) => {
+            var _a;
+            if (((_a = call === null || call === void 0 ? void 0 : call.sendOptions) === null || _a === void 0 ? void 0 : _a.timeoutSeconds) && !(call === null || call === void 0 ? void 0 : call.timeout)) {
+                Object.assign(call, {
+                    timeout: setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+                        var _b;
+                        const didTimeout = (yield Promise.race([
+                            call.promise,
+                            Promise.resolve("_WsClient_Internal_CallResolved"),
+                        ])) === "_WsClient_Internal_CallResolved";
+                        if (didTimeout) {
+                            call.promiseCallables.reject(new Error(`Call timeout after ${(_b = call.sendOptions) === null || _b === void 0 ? void 0 : _b.timeoutSeconds} seconds`));
+                        }
+                    }), Number(call.sendOptions.timeoutSeconds) * 1000),
+                });
+            }
+        };
         const process = (call) => {
-            var _a, _b;
+            var _a, _b, _c;
             // const isSubscription = call.request.command === "subscribe";
             if (String(((_b = (_a = call === null || call === void 0 ? void 0 : call.request) === null || _a === void 0 ? void 0 : _a.id) === null || _b === void 0 ? void 0 : _b._Request) || "").split("@")[0] !==
                 "_WsClient_Internal_ServerInfo") {
@@ -3047,20 +3127,30 @@ class XrplClient extends events_1.EventEmitter {
             try {
                 // log(call.request);
                 this.connection.send(JSON.stringify(call.request));
+                if ((_c = call === null || call === void 0 ? void 0 : call.sendOptions) === null || _c === void 0 ? void 0 : _c.timeoutStartsWhenOnline) {
+                    logWarning("APPLY TIMEOUT ONLY AFTER GOING ONLINE");
+                    applyCallTimeout(call);
+                }
             }
             catch (e) {
                 logWarning("Process (send to uplink) error", e.message);
             }
         };
         const call = (call) => {
-            var _a, _b;
+            var _a, _b, _c, _d, _e;
             if (String(((_b = (_a = call === null || call === void 0 ? void 0 : call.request) === null || _a === void 0 ? void 0 : _a.id) === null || _b === void 0 ? void 0 : _b._Request) || "").split("@")[0] !==
                 "_WsClient_Internal_ServerInfo") {
                 log(`Call ${call.id}: ${call.request.command}\n   > `, this.uplinkReady
                     ? "Uplink ready, pass immediately"
-                    : "Uplink not ready, wait for flush");
+                    : ((_c = call === null || call === void 0 ? void 0 : call.sendOptions) === null || _c === void 0 ? void 0 : _c.sendIfNotReady)
+                        ? "Uplink not flagged as ready yet, but `sendIfNotReady` = true, so go ahead"
+                        : "Uplink not ready, wait for flush");
             }
-            if (this.uplinkReady) {
+            if (!((_d = call === null || call === void 0 ? void 0 : call.sendOptions) === null || _d === void 0 ? void 0 : _d.timeoutStartsWhenOnline)) {
+                logWarning("APPLY TIMEOUT NO MATTER ONLINE/OFFLINE STATE");
+                applyCallTimeout(call);
+            }
+            if (this.uplinkReady || ((_e = call === null || call === void 0 ? void 0 : call.sendOptions) === null || _e === void 0 ? void 0 : _e.sendIfNotReady)) {
                 process(call);
             }
         };
@@ -3094,7 +3184,6 @@ class XrplClient extends events_1.EventEmitter {
         };
         const WsCleanup = () => {
             log("Cleanup");
-            // TODO:
             this.connection.removeEventListener("open", WsOpen);
             this.connection.removeEventListener("message", WsMessage);
             this.connection.removeEventListener("error", WsError);
@@ -3142,7 +3231,8 @@ class XrplClient extends events_1.EventEmitter {
             }
         });
     }
-    send(call) {
+    send(call, sendOptions = {}) {
+        var _a, _b, _c;
         assert_1.default(!this.closed, "Client in closed state");
         assert_1.default(typeof call === "object" && call, "`send()`: expecting object containing `command`");
         assert_1.default(typeof call.command === "string", "`command` must be typeof string");
@@ -3165,10 +3255,22 @@ class XrplClient extends events_1.EventEmitter {
             }),
             promise,
             promiseCallables,
+            sendOptions,
         };
-        const isSubscription = pendingCall.request.command === "subscribe" ||
+        const isSubscription = (pendingCall.request.command === "subscribe" ||
             pendingCall.request.command === "unsubscribe" ||
-            pendingCall.request.command === "path_find";
+            pendingCall.request.command === "path_find") &&
+            !(sendOptions === null || sendOptions === void 0 ? void 0 : sendOptions.noReplayAfterReconnect);
+        if (((_a = pendingCall.request) === null || _a === void 0 ? void 0 : _a.command) === "unsubscribe" &&
+            Array.isArray((_b = pendingCall.request) === null || _b === void 0 ? void 0 : _b.streams) &&
+            ((_c = pendingCall.request) === null || _c === void 0 ? void 0 : _c.streams.indexOf("ledger")) > -1) {
+            pendingCall.request.streams.splice(pendingCall.request.streams.indexOf("ledger"), 1);
+            if (pendingCall.request.streams.length === 0 &&
+                Object.keys(pendingCall.request).filter((key) => key !== "id" && key !== "streams" && key !== "command").length === 0) {
+                // Unsubscribing (just) streams
+                return Promise.reject(new Error("Unsubscribing from (just) the ledger stream is not allowed"));
+            }
+        }
         if (String((call === null || call === void 0 ? void 0 : call.id) || "").split("@")[0] !== "_WsClient_Internal_ServerInfo") {
             this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
         }

@@ -1,5 +1,12 @@
 export type AnyJson = Record<string, unknown>;
 
+export type SendOptions = {
+  sendIfNotReady?: boolean;
+  noReplayAfterReconnect?: boolean;
+  timeoutSeconds?: number;
+  timeoutStartsWhenOnline?: boolean;
+};
+
 export interface Call extends AnyJson {
   id?: string | number;
   command: string;
@@ -30,12 +37,14 @@ export interface PendingCall {
     resolve: CallableFunction;
     reject: CallableFunction;
   };
+  sendOptions?: SendOptions;
+  timeout?: ReturnType<typeof setTimeout>;
 }
 
 export interface WsClientOptions {
-  connectTimeout: number;
+  connectAttemptTimeoutSeconds?: number;
+  assumeOfflineAfterSeconds?: number;
   // maxPendingCalls: number;
-  // callTimeout: number;
 }
 
 export interface ServerInfoResponse extends AnyJson {

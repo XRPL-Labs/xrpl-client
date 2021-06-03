@@ -4,12 +4,51 @@
 
 Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket client. For in node & the browser.
 
+This client implements a check for a working XRPL connection: the WebSocket being simply online isn't enough to satisfy the online / offline detection of this lib. After connecting, this lib. will issue a `server_info` command to the other connected node. Only if a valid response is retrieved the connection will be marked as online.
+
+#### Constructor & options
+
+A client connection can be constructed with the exported `XrplClient` class:
+
+```typescript
+import { XrplClient } from "xrpl-client";
+const client = new XrplClient();
+```
+
+If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com). Alternatively, two arguments can be provided:
+
+- The WebSocket endpoint to connect to (e.g. your own node)
+- Global options (type: WsClientOptions)
+
+Available options are:
+
+- `assumeOfflineAfterSeconds`, `Number` » default **30**, this setting will check if the XRPL node on the other end of the connection is alive and sending regular `server_info` responses (this lib. queries for them). After the timeout, the lib. will disconnect from the node and try to reconnect.
+- `connectAttemptTimeoutSeconds`, `Number` » default **4**, this setting is the max. delay between reconnect attempts, if no connection could be setup to the XRPL node. A backoff starting at one second, growing with 20% per attempt until this value is reached will be used.
+
+Sample with a custom node & option:
+
+```typescript
+import { XrplClient } from "xrpl-client";
+const client = new XrplClient("ws://localhost:1337", {
+  assumeOfflineAfterSeconds: 15,
+});
+```
+
 #### Methods:
 
-- `send({ command: "..."})` » `Promise<CallResponse | AnyJson>` » Send a `comand` to the connected XRPL node.
+- `send({ command: "..."}, {SendOptions})` » `Promise<AnyJson | CallResponse>` » Send a `comand` to the connected XRPL node.
 - `ready()` » `Promise<self>` » fires when you're fully connected. While the `state` event (and `getState()` method) only return the WebSocket online state, `ready()` will only return (async) if the first ledger data has been received and the last ledger index is known.
 - `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
 - close() » `void` » Fully close the entire object (can't be used again).
+
+#### Send options
+
+The `send({ comand: "..." })` method allows you to set these options (second argument, object):
+
+- `timeoutSeconds`, `Boolean` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
+- `timeoutStartsWhenOnline`, `Number` » The timeout (see `timeoutSeconds`) will start when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node), so when your command has been issued by this lib. to the XRPL node on the other end of the connection.
+- `sendIfNotReady`, `Boolean` » Your commands will be sent to the XRPL node on the other end of the connection only when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node). Adding this option (`true`) will send your commands _after_ the WebSocket has been connected, but possibly _before_ a valid `server_info` response has been received by the XRPL node connected to.
+- `noReplayAfterReconnect`, `Boolean` » When adding a subscription (resulting in async. updates) like a `subscribe` or `path_find` command, when reconnected your subscription commands will automaticaly replay to the newly connected node. Providing a `false` to this option will prevent your commands from being replayed when reconnected.
 
 #### Events emitted:
 
@@ -25,7 +64,7 @@ Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket clie
 
 ### Syntax
 
-```javascript
+```typescript
 import { XrplClient } from "xrpl-client";
 const client = new XrplClient("wss://xrplcluster.com");
 
