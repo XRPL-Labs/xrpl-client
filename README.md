@@ -1,4 +1,4 @@
-# XRPL WebSocket Client [![npm version](https://badge.fury.io/js/xrpl-client.svg)](https://www.npmjs.com/xrpl-client) [![GitHub Actions NodeJS status](https://github.com/XRPL-Labs/xrpl-client/workflows/NodeJS/badge.svg?branch=main)](https://github.com/XRPL-Labs/xrpl-client/actions) [![CDNJS Browserified](https://img.shields.io/badge/cdnjs-browserified-blue)](https://cdn.jsdelivr.net/gh/XRPL-Labs/xrpl-client@main/dist/browser.js) [![CDNJS Browserified Minified](https://img.shields.io/badge/cdnjs-minified-orange)](https://cdn.jsdelivr.net/gh/XRPL-Labs/xrpl-client@main/dist/browser.min.js)
+# XRPL WebSocket Client [![npm version](https://badge.fury.io/js/xrpl-client.svg)](https://www.npmjs.com/xrpl-client) [![GitHub Actions NodeJS status](https://github.com/XRPL-Labs/xrpl-client/workflows/NodeJS/badge.svg?branch=main)](https://github.com/XRPL-Labs/xrpl-client/actions) [![CDNJS Browserified](https://img.shields.io/badge/cdnjs-browserified-blue)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) [![CDNJS Browserified Minified](https://img.shields.io/badge/cdnjs-minified-orange)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js)
 
 ### XRP Ledger WebSocket Client, npm: `xrpl-client`
 
@@ -88,7 +88,7 @@ You can clone this repository and run:
 
 Now the `dist/browser.js` file will exist, for you to use in a browser.
 
-Alternatively you can get a [prebuilt](https://cdn.jsdelivr.net/gh/XRPL-Labs/xrpl-client@main/dist/browser.js) / [prebuilt & minified](https://cdn.jsdelivr.net/gh/XRPL-Labs/xrpl-client@main/dist/browser.min.js) version from Github.
+Alternatively you can get a [prebuilt](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) / [prebuilt & minified](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js) version from Github.
 
 Sample: [https://jsfiddle.net/WietseWind/p4cd37hf](https://jsfiddle.net/WietseWind/p4cd37hf/)
 
@@ -104,8 +104,8 @@ const Connection = new RippledWsClient('wss://testnet.xrpl-labs.com')
 Connection.ready().then(() => {
 ```
 
-3. When used in combination with `rippled-ws-client-sign` (please use `xrpl-accountlib`) you need to wrap the class:
+3. When used in combination with `rippled-ws-client-sign` ([please use `xrpl-accountlib` instead!](https://www.npmjs.com/package/xrpl-accountlib)) you need to wrap the class:
 
 ```javascript
-class RippledWsClient extends XrplClient { } // Then use RippledWsClient
+class RippledWsClient extends XrplClient {} // Then use RippledWsClient
 ```
