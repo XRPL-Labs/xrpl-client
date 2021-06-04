@@ -31,6 +31,32 @@ const connectAttemptTimeoutSeconds = 4;
 const assumeOfflineAfterSeconds = 20;
 const maxConnectionAttempts = null;
 
+// Events
+export declare interface XrplClient {
+  on(event: "close"): this;
+  on(event: "state", listener: (state: ConnectionState) => any): this;
+  on(event: "retry"): this;
+  on(event: "reconnect"): this;
+  on(
+    event: "message",
+    listener: (message: CallResponse | AnyJson) => any
+  ): this;
+  on(
+    event: "transaction",
+    listener: (transaction: CallResponse | AnyJson) => any
+  ): this;
+  on(
+    event: "validation",
+    listener: (validation: CallResponse | AnyJson) => any
+  ): this;
+  on(event: "path", listener: (path: CallResponse | AnyJson) => any): this;
+  on(event: "ledger", listener: (ledger: CallResponse | AnyJson) => any): this;
+  on(event: "error", listener: (e: Error) => any): this;
+
+  on(event: string, listener: Function): this;
+}
+
+// Class
 export class XrplClient extends EventEmitter {
   private connectBackoff: number = 1000 / 1.2;
   private closed: boolean = false;
