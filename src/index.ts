@@ -497,7 +497,7 @@ export class XrplClient extends EventEmitter {
       this.off("reconnect", connect);
 
       if (error) {
-        throw error;
+        this.emit("error", error);
       }
     };
 
