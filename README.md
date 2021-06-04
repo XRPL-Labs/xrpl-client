@@ -23,6 +23,7 @@ If no argument is provided, the default endpoint this lib. will connect to is [`
 Available options are:
 
 - `assumeOfflineAfterSeconds`, `Number` » default **30**, this setting will check if the XRPL node on the other end of the connection is alive and sending regular `server_info` responses (this lib. queries for them). After the timeout, the lib. will disconnect from the node and try to reconnect.
+- `maxConnectionAttempts`, `Number` | `null` » default **null**, if (when initially connecting or reconnecting) no (new) connection could be setup in this attempts (see: `connectAttemptTimeoutSeconds` per call) consider the connection dead. Cancel all connect/reconnect attempts, clear the command buffer. An error will be thrown.
 - `connectAttemptTimeoutSeconds`, `Number` » default **4**, this setting is the max. delay between reconnect attempts, if no connection could be setup to the XRPL node. A backoff starting at one second, growing with 20% per attempt until this value is reached will be used.
 
 Sample with a custom node & option:

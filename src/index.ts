@@ -27,17 +27,19 @@ const logWarning = log.extend("warning");
 const logMessage = log.extend("message");
 const logNodeInfo = log.extend("node");
 
+const connectAttemptTimeoutSeconds = 4;
+const assumeOfflineAfterSeconds = 20;
+const maxConnectionAttempts = null;
+
 export class XrplClient extends EventEmitter {
   private connectBackoff: number = 1000 / 1.2;
   private closed: boolean = false;
   private uplinkReady: boolean = false;
 
   private options: WsClientOptions = {
-    connectAttemptTimeoutSeconds: 4,
-    assumeOfflineAfterSeconds: 30,
-    // TODO:
-    // maxPendingCalls: 100,
-    // callTimeout: 20,
+    connectAttemptTimeoutSeconds,
+    assumeOfflineAfterSeconds,
+    maxConnectionAttempts,
   };
 
   private callId: number = 0;
@@ -54,6 +56,7 @@ export class XrplClient extends EventEmitter {
     reserveInc: null,
     latency: [],
     fee: [],
+    connectAttempts: 0,
   };
 
   private lastContact?: Date;
@@ -72,7 +75,9 @@ export class XrplClient extends EventEmitter {
     const alive = (): void => {
       clearTimeout(livelinessCheck);
       const seconds =
-        Number(this?.options?.assumeOfflineAfterSeconds || 30) * 1_000;
+        Number(
+          this?.options?.assumeOfflineAfterSeconds || assumeOfflineAfterSeconds
+        ) * 1_000;
       livelinessCheck = setTimeout(() => {
         logWarning(
           "----- CONNECTION TIMEOUT, NO LEDER INFO RECEIVED FOR ",
@@ -106,6 +111,8 @@ export class XrplClient extends EventEmitter {
      */
     const connectionReady = (): void => {
       if (!this.uplinkReady) {
+        this.serverState.connectAttempts = 0;
+
         logNodeInfo("Connection ready, fire events");
 
         this.connectBackoff = 1000 / 1.2;
@@ -155,7 +162,10 @@ export class XrplClient extends EventEmitter {
 
       this.connectBackoff = Math.min(
         Math.round(this.connectBackoff * 1.2),
-        Number(this.options?.connectAttemptTimeoutSeconds || 4) * 1000
+        Number(
+          this.options?.connectAttemptTimeoutSeconds ||
+            connectAttemptTimeoutSeconds
+        ) * 1000
       );
 
       this.uplinkReady = false;
@@ -458,7 +468,7 @@ export class XrplClient extends EventEmitter {
       });
     };
 
-    const close = (): void => {
+    const close = (error?: Error): void => {
       this.closed = true;
       log("Closing connection");
       WsCleanup();
@@ -469,10 +479,26 @@ export class XrplClient extends EventEmitter {
         //
       }
 
+      clearTimeout(livelinessCheck);
+      this.subscriptions.forEach((subscription) => {
+        subscription.promiseCallables.reject(
+          new Error("Class (connection) hard close requested")
+        );
+      });
+      this.pendingCalls.forEach((call) => {
+        call.promiseCallables.reject(
+          new Error("Class (connection) hard close requested")
+        );
+      });
+
       this.off("__WsClient_call", call);
       this.off("__WsClient_close", close);
       this.off("flush", flush);
       this.off("reconnect", connect);
+
+      if (error) {
+        throw error;
+      }
     };
 
     const WsCleanup = (): void => {
@@ -491,6 +517,21 @@ export class XrplClient extends EventEmitter {
       }
 
       log("Connecting", this.endpoint);
+
+      this.serverState.connectAttempts++;
+      if (
+        this.options.maxConnectionAttempts &&
+        Number(this.options?.maxConnectionAttempts || 1) > 1 &&
+        this.serverState.connectAttempts >
+          Number(this.options?.maxConnectionAttempts || 1)
+      ) {
+        logNodeInfo(
+          "Too many connection attempts",
+          this.serverState.connectAttempts,
+          this.options?.maxConnectionAttempts
+        );
+        close(new Error("Max. connection attempts exceeded"));
+      }
 
       const connection = new WebSocket(this.endpoint);
       (connection as any).addEventListener("open", WsOpen);
@@ -511,6 +552,9 @@ export class XrplClient extends EventEmitter {
     // setTimeout(() => {
     this.connection = connect();
     // }, 2000);
+    setInterval(() => {
+      logNodeInfo("Connection Attempts", this.serverState.connectAttempts);
+    }, 4000);
   }
 
   ready(): Promise<XrplClient> {
@@ -534,7 +578,6 @@ export class XrplClient extends EventEmitter {
   }
 
   send(call: Call, sendOptions: SendOptions = {}): Promise<AnyJson> {
-    assert(!this.closed, "Client in closed state");
     assert(
       typeof call === "object" && call,
       "`send()`: expecting object containing `command`"
@@ -545,7 +588,7 @@ export class XrplClient extends EventEmitter {
 
     const promiseCallables = {
       resolve: (arg: AnyJson): void => {},
-      reject: (arg: AnyJson): void => {},
+      reject: (arg: Error): void => {},
     };
 
     const promise = new Promise<AnyJson>((resolve, reject): void => {
@@ -565,6 +608,11 @@ export class XrplClient extends EventEmitter {
       promiseCallables,
       sendOptions,
     };
+
+    if (this.closed) {
+      promiseCallables.reject(new Error("Client in closed state"));
+      return promise;
+    }
 
     const isSubscription =
       (pendingCall.request.command === "subscribe" ||
