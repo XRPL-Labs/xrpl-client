@@ -534,6 +534,15 @@ export class XrplClient extends EventEmitter {
       }
 
       const connection = new WebSocket(this.endpoint);
+
+      // Prevent possible DNS resolve hang, and a custom
+      // resolver sucks
+      setTimeout(() => {
+        if (connection.readyState !== WebSocket.OPEN) {
+          connection.close();
+        }
+      }, this.connectBackoff * 1.2 - 1);
+
       (connection as any).addEventListener("open", WsOpen);
       (connection as any).addEventListener("message", WsMessage);
       (connection as any).addEventListener("error", WsError);
@@ -552,9 +561,9 @@ export class XrplClient extends EventEmitter {
     // setTimeout(() => {
     this.connection = connect();
     // }, 2000);
-    setInterval(() => {
-      logNodeInfo("Connection Attempts", this.serverState.connectAttempts);
-    }, 4000);
+    // setInterval(() => {
+    //   logNodeInfo("Connection Attempts", this.serverState.connectAttempts);
+    // }, 4000);
   }
 
   ready(): Promise<XrplClient> {
