@@ -12,13 +12,19 @@ A client connection can be constructed with the exported `XrplClient` class:
 
 ```typescript
 import { XrplClient } from "xrpl-client";
-const client = new XrplClient();
+const client = new XrplClient(/* endpoint(s), options */);
+// ^^ No arguments: defaults to one endpoint: wss://xrplcluster.com
+// with `maxConnectionAttempts` option `null` (try forever)
 ```
 
 If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com). Alternatively, two arguments can be provided:
 
-- The WebSocket endpoint to connect to (e.g. your own node) as a `string`, or an array (`string[]`) with multiple endpoints used in specified order.
-- Global options (type: WsClientOptions)
+###### Arguments
+
+1. (string | array) The WebSocket endpoint to connect to (e.g. your own node) as a `string`, or an array (`string[]`) with multiple endpoints used in specified order
+2. (object) Global options (type: WsClientOptions)
+
+###### Options
 
 Available options are:
 
@@ -34,7 +40,7 @@ const client = new XrplClient(
   ["ws://localhost:1337", "wss://xrplcluster.com"],
   {
     assumeOfflineAfterSeconds: 15,
-    maxConnectionAttempts: 5,
+    //  maxConnectionAttempts: 5,
     connectAttemptTimeoutSeconds: 5,
   }
 );
@@ -74,6 +80,7 @@ The `send({ comand: "..." })` method allows you to set these options (second arg
 - `nodeswitch` » string (node) - Switched to a new node
 - `online` » Now conneted to an XRPL node, use `.getState()` for more info
 - `offline` » Was online, but the connection is gone
+- `round` » Tried all nodes, retry the first one
 
 Let's say you have two dead endpoints and a third one that works, then your connection is lost and you switch to the fourth one. The event sequence would look like this:
 

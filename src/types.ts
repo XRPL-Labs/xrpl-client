@@ -29,6 +29,7 @@ export interface XrplClientEvents {
   retry: () => void;
   online: () => void;
   offline: () => void;
+  round: () => void;
   nodeswitch: (endpoint: string) => void;
 
   state: (state: ConnectionState) => void;

@@ -156,6 +156,7 @@ export class XrplClient extends EventEmitter {
         this.uplinkReady = true;
         this.eventBus.emit("flush");
         this.emit("online");
+        this.endpoint = this.endpoints[0];
         this.emit("state", this.getState());
       }
     };
@@ -602,7 +603,11 @@ export class XrplClient extends EventEmitter {
               nextEndpointIndex >= this.endpoints.length ? 0 : nextEndpointIndex
             ];
           logWarning("--- New endpoint", this.endpoint);
+          this.serverState.connectAttempts = 0;
           this.emit("nodeswitch", this.endpoint);
+          if (nextEndpointIndex >= this.endpoints.length) {
+            this.emit("round");
+          }
         } else {
           logWarning(
             "Only one valid endpoint, after the max. connection attempts: game over"
@@ -780,7 +785,7 @@ export class XrplClient extends EventEmitter {
         version: this.serverInfo?.result?.info?.build_version || "",
         uptime: this.serverInfo?.result?.info?.uptime || 0,
         publicKey: this.serverInfo?.result?.info?.pubkey_node || "",
-        uri: this.endpoint,
+        uri: this.connection.url,
       },
       ledger: {
         last: Number(
