@@ -54,6 +54,7 @@ export class XrplClient extends EventEmitter {
   };
 
   private callId: number = 0;
+  private endpoints: string[];
   private endpoint: string;
   private connection: WebSocket;
 
@@ -72,7 +73,10 @@ export class XrplClient extends EventEmitter {
 
   private lastContact?: Date;
 
-  constructor(endpoint = "wss://xrplcluster.com", options?: WsClientOptions) {
+  constructor(
+    endpoint: string | string[] = "wss://xrplcluster.com",
+    options?: WsClientOptions
+  ) {
     super();
 
     if (options) {
@@ -90,15 +94,18 @@ export class XrplClient extends EventEmitter {
           this?.options?.assumeOfflineAfterSeconds || assumeOfflineAfterSeconds
         ) * 1_000;
       livelinessCheck = setTimeout(() => {
-        logWarning(
-          "----- CONNECTION TIMEOUT, NO LEDER INFO RECEIVED FOR ",
-          seconds,
-          "SECONDS -----"
-        );
-        try {
-          this.connection?.close();
-        } catch (e) {
-          //
+        // Only if the connection ever was online to begin with
+        if (this.uplinkReady) {
+          logWarning(
+            "----- CONNECTION TIMEOUT, NO LEDER INFO RECEIVED FOR ",
+            seconds,
+            "SECONDS -----"
+          );
+          try {
+            this.connection?.close();
+          } catch (e) {
+            //
+          }
         }
       }, seconds);
     };
@@ -108,7 +115,24 @@ export class XrplClient extends EventEmitter {
     //   log("» Pending Call Length", this.pendingCalls.length);
     // }, 5000);
 
-    this.endpoint = endpoint.trim();
+    this.endpoints = [
+      ...new Set<string>(Array.isArray(endpoint) ? endpoint : [endpoint]),
+    ]
+      .map((uplink) => uplink.trim())
+      .filter((uplink) => uplink.match(/^ws[s]{0,1}:\/\//));
+
+    if (this.endpoints.length < 1) {
+      throw new Error("No valid WebSocket endpoint(s) specified");
+    }
+
+    this.endpoint = this.endpoints[0].trim();
+
+    if (this.endpoints.length > 1 && !this.options?.maxConnectionAttempts) {
+      log(
+        `Multiple endpoints (${this.endpoints.length}) and no maxConnection attempts, set (5)`
+      );
+      Object.assign(this.options, { maxConnectionAttempts: 5 });
+    }
 
     log(`Initialized xrpld WebSocket Client`);
 
@@ -116,6 +140,8 @@ export class XrplClient extends EventEmitter {
       connectionReady();
       alive();
     });
+
+    const ignore = (): void => {};
 
     /**
      * Important one
@@ -129,6 +155,7 @@ export class XrplClient extends EventEmitter {
         this.connectBackoff = 1000 / 1.2;
         this.uplinkReady = true;
         this.eventBus.emit("flush");
+        this.emit("online");
         this.emit("state", this.getState());
       }
     };
@@ -137,29 +164,37 @@ export class XrplClient extends EventEmitter {
      * WebSocket client event handlers
      */
     const WsOpen = (): void => {
-      log("Connection opened :)");
-
       /**
        * We're firing two commands when we're connected
        */
-      this.send(
-        {
-          id: "_WsClient_Internal_Subscription",
-          command: "subscribe",
-          streams: ["ledger"],
-        },
-        { sendIfNotReady: true, noReplayAfterReconnect: true }
-      );
+      if (!this.closed) {
+        log("Connection opened :)");
 
-      this.send(
-        {
-          id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
-          command: "server_info",
-        },
-        { sendIfNotReady: true, noReplayAfterReconnect: true }
-      ).then(() => {
-        connectionReady();
-      });
+        this.send(
+          {
+            id: "_WsClient_Internal_Subscription",
+            command: "subscribe",
+            streams: ["ledger"],
+          },
+          { sendIfNotReady: true, noReplayAfterReconnect: true }
+        ).then(ignore, ignore);
+
+        this.send(
+          {
+            id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
+            command: "server_info",
+          },
+          { sendIfNotReady: true, noReplayAfterReconnect: true }
+        ).then(() => {
+          connectionReady();
+        }, ignore);
+      } else {
+        try {
+          this.connection.close();
+        } catch (e) {
+          // If timing: came online after close: kill
+        }
+      }
 
       // setTimeout(() => {
       //   // this.connection.close();
@@ -179,6 +214,10 @@ export class XrplClient extends EventEmitter {
         ) * 1000
       );
 
+      if (this.uplinkReady) {
+        // Was online
+        this.emit("offline");
+      }
       this.uplinkReady = false;
       this.serverInfo = undefined;
 
@@ -288,7 +327,7 @@ export class XrplClient extends EventEmitter {
           this.send({
             id: "_WsClient_Internal_ServerInfo@" + Number(new Date()),
             command: "server_info",
-          });
+          }).then(ignore, ignore);
         } else if (message?.type === "path_find") {
           logMessage("Async", message.type);
           this.emit("path", message);
@@ -531,6 +570,7 @@ export class XrplClient extends EventEmitter {
       log("Connecting", this.endpoint);
 
       this.serverState.connectAttempts++;
+
       if (
         this.options.maxConnectionAttempts &&
         Number(this.options?.maxConnectionAttempts || 1) > 1 &&
@@ -542,27 +582,55 @@ export class XrplClient extends EventEmitter {
           this.serverState.connectAttempts,
           this.options?.maxConnectionAttempts
         );
-        close(new Error("Max. connection attempts exceeded"));
+        log(
+          this.endpoint,
+          this.endpoints,
+          this.endpoints.length,
+          this.endpoints.indexOf(this.endpoint)
+        );
+        if (
+          this.endpoints.length > 1 &&
+          this.endpoints.indexOf(this.endpoint) > -1
+        ) {
+          logWarning(
+            "Multiple endpoints, max. connection attempts exceeded. Switch endpoint."
+          );
+          const nextEndpointIndex = this.endpoints.indexOf(this.endpoint) + 1;
+          logWarning("--- Current endpoint", this.endpoint);
+          this.endpoint =
+            this.endpoints[
+              nextEndpointIndex >= this.endpoints.length ? 0 : nextEndpointIndex
+            ];
+          logWarning("--- New endpoint", this.endpoint);
+          this.emit("nodeswitch", this.endpoint);
+        } else {
+          logWarning(
+            "Only one valid endpoint, after the max. connection attempts: game over"
+          );
+          close(new Error("Max. connection attempts exceeded"));
+        }
       }
 
-      const connection = new WebSocket(this.endpoint);
+      if (!this.closed) {
+        const connection = new WebSocket(this.endpoint);
 
-      // Prevent possible DNS resolve hang, and a custom
-      // resolver sucks
-      setTimeout(() => {
-        if (connection.readyState !== WebSocket.OPEN) {
-          connection.close();
-        }
-      }, this.connectBackoff * 1.2 - 1);
+        // Prevent possible DNS resolve hang, and a custom
+        // resolver sucks
+        setTimeout(() => {
+          if (connection.readyState !== WebSocket.OPEN) {
+            connection.close();
+          }
+        }, this.connectBackoff * 1.2 - 1);
 
-      (connection as any).addEventListener("open", WsOpen);
-      (connection as any).addEventListener("message", WsMessage);
-      (connection as any).addEventListener("error", WsError);
-      (connection as any).addEventListener("close", WsClose);
+        (connection as any).addEventListener("open", WsOpen);
+        (connection as any).addEventListener("message", WsMessage);
+        (connection as any).addEventListener("error", WsError);
+        (connection as any).addEventListener("close", WsClose);
 
-      this.connection = connection;
+        this.connection = connection;
+      }
 
-      return connection;
+      return this.connection;
     };
 
     this.eventBus.on("__WsClient_call", call);

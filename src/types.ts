@@ -27,6 +27,9 @@ export declare interface EventBus {
 export interface XrplClientEvents {
   close: () => void;
   retry: () => void;
+  online: () => void;
+  offline: () => void;
+  nodeswitch: (endpoint: string) => void;
 
   state: (state: ConnectionState) => void;
 

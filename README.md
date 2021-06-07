@@ -17,22 +17,27 @@ const client = new XrplClient();
 
 If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com). Alternatively, two arguments can be provided:
 
-- The WebSocket endpoint to connect to (e.g. your own node)
+- The WebSocket endpoint to connect to (e.g. your own node) as a `string`, or an array (`string[]`) with multiple endpoints used in specified order.
 - Global options (type: WsClientOptions)
 
 Available options are:
 
 - `assumeOfflineAfterSeconds`, `Number` » default **30**, this setting will check if the XRPL node on the other end of the connection is alive and sending regular `server_info` responses (this lib. queries for them). After the timeout, the lib. will disconnect from the node and try to reconnect.
-- `maxConnectionAttempts`, `Number` | `null` » default **null**, if (when initially connecting or reconnecting) no (new) connection could be setup in this attempts (see: `connectAttemptTimeoutSeconds` per call) consider the connection dead. Cancel all connect/reconnect attempts, clear the command buffer. An error will be thrown.
+- `maxConnectionAttempts`, `Number` | `null` » default **null** in case of one endpoint, or **5** if an array with endpoints is provided, if (when initially connecting or reconnecting) no (new) connection could be setup in this attempts (see: `connectAttemptTimeoutSeconds` per call) consider the connection dead. Cancel all connect/reconnect attempts, clear the command buffer. An error will be thrown.
 - `connectAttemptTimeoutSeconds`, `Number` » default **4**, this setting is the max. delay between reconnect attempts, if no connection could be setup to the XRPL node. A backoff starting at one second, growing with 20% per attempt until this value is reached will be used.
 
 Sample with a custom node & option:
 
 ```typescript
 import { XrplClient } from "xrpl-client";
-const client = new XrplClient("ws://localhost:1337", {
-  assumeOfflineAfterSeconds: 15,
-});
+const client = new XrplClient(
+  ["ws://localhost:1337", "wss://xrplcluster.com"],
+  {
+    assumeOfflineAfterSeconds: 15,
+    maxConnectionAttempts: 5,
+    connectAttemptTimeoutSeconds: 5,
+  }
+);
 ```
 
 #### Methods:
@@ -62,6 +67,24 @@ The `send({ comand: "..." })` method allows you to set these options (second arg
 - `retry` (new connection attempt)
 - `close` (upstream closed the connection)
 - `reconnect` (reconnecting, after connected: `state`)
+
+#### Connection flow events:
+
+- `retry` - Same node, new connection attempt (attempt timed out)
+- `nodeswitch` » string (node) - Switched to a new node
+- `online` » Now conneted to an XRPL node, use `.getState()` for more info
+- `offline` » Was online, but the connection is gone
+
+Let's say you have two dead endpoints and a third one that works, then your connection is lost and you switch to the fourth one. The event sequence would look like this:
+
+```
+1. retry » 2. retry » 3. retry » 4. nodeswitch
+5. retry » 6. retry » 7. retry » 8. nodeswitch
+9. online
+10. offline
+11. retry » 12. retry » 13. retry » 14. nodeswitch
+15. online
+```
 
 ### Syntax
 
