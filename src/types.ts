@@ -1,5 +1,43 @@
 export type AnyJson = Record<string, unknown>;
 
+export interface EventBusEvents {
+  __WsClient_call: (call: PendingCall) => void;
+  __WsClient_close: () => void;
+  reconnect: () => void;
+  flush: () => void;
+}
+
+export declare interface EventBus {
+  on<U extends keyof EventBusEvents>(
+    event: U,
+    listener: EventBusEvents[U]
+  ): this;
+
+  off<U extends keyof EventBusEvents>(
+    event: U,
+    listener: EventBusEvents[U]
+  ): this;
+
+  emit<U extends keyof EventBusEvents>(
+    event: U,
+    ...args: Parameters<EventBusEvents[U]>
+  ): boolean;
+}
+
+export interface XrplClientEvents {
+  close: () => void;
+  retry: () => void;
+
+  state: (state: ConnectionState) => void;
+
+  message: (message: CallResponse | AnyJson) => void;
+  transaction: (transaction: CallResponse | AnyJson) => void;
+  validation: (validation: CallResponse | AnyJson) => void;
+  path: (path: CallResponse | AnyJson) => void;
+  ledger: (ledger: CallResponse | AnyJson) => void;
+  error: (e: Error) => void;
+}
+
 export interface WsClientOptions {
   connectAttemptTimeoutSeconds?: number;
   maxConnectionAttempts?: number | null;

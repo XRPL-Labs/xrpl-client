@@ -17,6 +17,8 @@ import {
   ConnectionState,
   ServerState,
   SendOptions,
+  EventBus,
+  XrplClientEvents,
 } from "./types";
 
 export * from "./types";
@@ -31,33 +33,16 @@ const connectAttemptTimeoutSeconds = 4;
 const assumeOfflineAfterSeconds = 20;
 const maxConnectionAttempts = null;
 
-// Events
 export declare interface XrplClient {
-  on(event: "close"): this;
-  on(event: "state", listener: (state: ConnectionState) => any): this;
-  on(event: "retry"): this;
-  on(event: "reconnect"): this;
-  on(
-    event: "message",
-    listener: (message: CallResponse | AnyJson) => any
+  on<U extends keyof XrplClientEvents>(
+    event: U,
+    listener: XrplClientEvents[U]
   ): this;
-  on(
-    event: "transaction",
-    listener: (transaction: CallResponse | AnyJson) => any
-  ): this;
-  on(
-    event: "validation",
-    listener: (validation: CallResponse | AnyJson) => any
-  ): this;
-  on(event: "path", listener: (path: CallResponse | AnyJson) => any): this;
-  on(event: "ledger", listener: (ledger: CallResponse | AnyJson) => any): this;
-  on(event: "error", listener: (e: Error) => any): this;
-
-  on(event: string, listener: Function): this;
 }
 
-// Class
 export class XrplClient extends EventEmitter {
+  private eventBus: EventBus = new EventEmitter();
+
   private connectBackoff: number = 1000 / 1.2;
   private closed: boolean = false;
   private uplinkReady: boolean = false;
@@ -143,7 +128,7 @@ export class XrplClient extends EventEmitter {
 
         this.connectBackoff = 1000 / 1.2;
         this.uplinkReady = true;
-        this.emit("flush");
+        this.eventBus.emit("flush");
         this.emit("state", this.getState());
       }
     };
@@ -208,7 +193,7 @@ export class XrplClient extends EventEmitter {
         );
 
         setTimeout(() => {
-          this.emit("reconnect");
+          this.eventBus.emit("reconnect");
         }, this.connectBackoff);
       } else {
         log("Closed on purpose, not reconnecting");
@@ -268,6 +253,22 @@ export class XrplClient extends EventEmitter {
 
     const handleAsyncWsMessage = (message: CallResponse): void => {
       if (message?.id?._Request !== "_WsClient_Internal_Subscription") {
+        let matchingSubscription;
+
+        if (message?.id?._WsClient) {
+          const _matching = this.subscriptions.filter(
+            (s) => s.id === message?.id?._WsClient
+          );
+          if (_matching.length > 0) {
+            matchingSubscription = _matching[0];
+            matchingSubscription.promiseCallables.resolve(
+              Object.assign(message, {
+                id: message?.id?._Request,
+              })
+            );
+          }
+        }
+
         this.emit("message", message);
 
         if (message?.type === "ledgerClosed") {
@@ -298,17 +299,6 @@ export class XrplClient extends EventEmitter {
           logMessage("Async", "validation");
           this.emit("validation", message);
         } else {
-          let matchingSubscription;
-
-          if (message?.id?._WsClient) {
-            const _matching = this.subscriptions.filter(
-              (s) => s.id === message?.id?._WsClient
-            );
-            if (_matching.length > 0) {
-              matchingSubscription = _matching[0];
-            }
-          }
-
           if (matchingSubscription?.request?.command === "path_find") {
             logMessage("Async", matchingSubscription?.request?.command);
             this.emit("path", message);
@@ -320,11 +310,7 @@ export class XrplClient extends EventEmitter {
             logMessage("Async", "subscription:ledger");
             this.emit("ledger", message);
           } else if (matchingSubscription) {
-            matchingSubscription.promiseCallables.resolve(
-              Object.assign(message, {
-                id: message?.id?._Request,
-              })
-            );
+            // Don't log `Unknown` as we know this
           } else {
             const isInternal =
               message?.id?._Request &&
@@ -447,7 +433,7 @@ export class XrplClient extends EventEmitter {
         // log(call.request);
         this.connection.send(JSON.stringify(call.request));
         if (call?.sendOptions?.timeoutStartsWhenOnline) {
-          logWarning("APPLY TIMEOUT ONLY AFTER GOING ONLINE");
+          // logWarning("APPLY TIMEOUT ONLY AFTER GOING ONLINE");
           applyCallTimeout(call);
         }
       } catch (e) {
@@ -471,7 +457,7 @@ export class XrplClient extends EventEmitter {
       }
 
       if (!call?.sendOptions?.timeoutStartsWhenOnline) {
-        logWarning("APPLY TIMEOUT NO MATTER ONLINE/OFFLINE STATE");
+        // logWarning("APPLY TIMEOUT NO MATTER ONLINE/OFFLINE STATE");
         applyCallTimeout(call);
       }
 
@@ -517,10 +503,10 @@ export class XrplClient extends EventEmitter {
         );
       });
 
-      this.off("__WsClient_call", call);
-      this.off("__WsClient_close", close);
-      this.off("flush", flush);
-      this.off("reconnect", connect);
+      this.eventBus.off("__WsClient_call", call);
+      this.eventBus.off("__WsClient_close", close);
+      this.eventBus.off("flush", flush);
+      this.eventBus.off("reconnect", connect);
 
       if (error) {
         this.emit("error", error);
@@ -579,10 +565,10 @@ export class XrplClient extends EventEmitter {
       return connection;
     };
 
-    this.on("__WsClient_call", call);
-    this.on("__WsClient_close", close);
-    this.on("flush", flush);
-    this.on("reconnect", connect);
+    this.eventBus.on("__WsClient_call", call);
+    this.eventBus.on("__WsClient_close", close);
+    this.eventBus.on("flush", flush);
+    this.eventBus.on("reconnect", connect);
 
     // setTimeout(() => {
     this.connection = connect();
@@ -686,7 +672,7 @@ export class XrplClient extends EventEmitter {
       this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
     }
 
-    this.emit("__WsClient_call", pendingCall);
+    this.eventBus.emit("__WsClient_call", pendingCall);
 
     return promise;
   }
@@ -766,6 +752,6 @@ export class XrplClient extends EventEmitter {
 
   close(): void {
     assert(!this.closed, "Object already in closed state");
-    this.emit("__WsClient_close");
+    this.eventBus.emit("__WsClient_close");
   }
 }
