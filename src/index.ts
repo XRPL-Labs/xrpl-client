@@ -29,8 +29,8 @@ const logWarning = log.extend("warning");
 const logMessage = log.extend("message");
 const logNodeInfo = log.extend("node");
 
-const connectAttemptTimeoutSeconds = 4;
-const assumeOfflineAfterSeconds = 20;
+const connectAttemptTimeoutSeconds = 3;
+const assumeOfflineAfterSeconds = 15;
 const maxConnectionAttempts = null;
 
 export declare interface XrplClient {
@@ -43,7 +43,6 @@ export declare interface XrplClient {
 export class XrplClient extends EventEmitter {
   private eventBus: EventBus = new EventEmitter();
 
-  private connectBackoff: number = 1000 / 1.2;
   private closed: boolean = false;
   private uplinkReady: boolean = false;
 
@@ -68,7 +67,7 @@ export class XrplClient extends EventEmitter {
     reserveInc: null,
     latency: [],
     fee: [],
-    connectAttempts: 0,
+    connectAttempts: -1,
   };
 
   private lastContact?: Date;
@@ -111,6 +110,31 @@ export class XrplClient extends EventEmitter {
     };
     alive();
 
+    const reconnectTime = (): number => {
+      let factor = 1;
+
+      const attempts =
+        this.options?.maxConnectionAttempts || maxConnectionAttempts;
+
+      if (attempts) {
+        factor =
+          ((this.options?.connectAttemptTimeoutSeconds ||
+            connectAttemptTimeoutSeconds) -
+            1) /
+          (attempts - 1);
+      }
+
+      const reconnectSeconds = Math.max(
+        1.5,
+        (this.serverState.connectAttempts + 1) * factor
+      );
+      // log(
+      //   `___________________ ${reconnectSeconds} reconnectSeconds ________________`
+      // );
+
+      return reconnectSeconds;
+    };
+
     // setInterval(() => {
     //   log("» Pending Call Length", this.pendingCalls.length);
     // }, 5000);
@@ -129,9 +153,9 @@ export class XrplClient extends EventEmitter {
 
     if (this.endpoints.length > 1 && !this.options?.maxConnectionAttempts) {
       log(
-        `Multiple endpoints (${this.endpoints.length}) and no maxConnection attempts, set (5)`
+        `Multiple endpoints (${this.endpoints.length}) and no maxConnection attempts, set (3)`
       );
-      Object.assign(this.options, { maxConnectionAttempts: 5 });
+      Object.assign(this.options, { maxConnectionAttempts: 3 });
     }
 
     log(`Initialized xrpld WebSocket Client`);
@@ -152,7 +176,6 @@ export class XrplClient extends EventEmitter {
 
         logNodeInfo("Connection ready, fire events");
 
-        this.connectBackoff = 1000 / 1.2;
         this.uplinkReady = true;
         this.eventBus.emit("flush");
         this.emit("online");
@@ -207,14 +230,6 @@ export class XrplClient extends EventEmitter {
       this.emit("close");
       this.emit("state", this.getState());
 
-      this.connectBackoff = Math.min(
-        Math.round(this.connectBackoff * 1.2),
-        Number(
-          this.options?.connectAttemptTimeoutSeconds ||
-            connectAttemptTimeoutSeconds
-        ) * 1000
-      );
-
       if (this.uplinkReady) {
         // Was online
         this.emit("offline");
@@ -229,12 +244,12 @@ export class XrplClient extends EventEmitter {
         this.emit("retry");
 
         logWarning(
-          `Not closed on purpose, reconnecting after ${this.connectBackoff}...`
+          `Not closed on purpose, reconnecting after ${reconnectTime()}...`
         );
 
         setTimeout(() => {
           this.eventBus.emit("reconnect");
-        }, this.connectBackoff);
+        }, reconnectTime() * 1000);
       } else {
         log("Closed on purpose, not reconnecting");
       }
@@ -575,7 +590,7 @@ export class XrplClient extends EventEmitter {
       if (
         this.options.maxConnectionAttempts &&
         Number(this.options?.maxConnectionAttempts || 1) > 1 &&
-        this.serverState.connectAttempts >
+        this.serverState.connectAttempts >=
           Number(this.options?.maxConnectionAttempts || 1)
       ) {
         logNodeInfo(
@@ -625,7 +640,7 @@ export class XrplClient extends EventEmitter {
           if (connection.readyState !== WebSocket.OPEN) {
             connection.close();
           }
-        }, this.connectBackoff * 1.2 - 1);
+        }, reconnectTime() * 1000 - 1);
 
         (connection as any).addEventListener("open", WsOpen);
         (connection as any).addEventListener("message", WsMessage);
