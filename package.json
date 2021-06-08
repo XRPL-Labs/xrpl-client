@@ -5,7 +5,8 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "prepare": "npm run clean && npm run lint && npm run test && npm run build && npm run browserify",
+    "prepare": "npm run prepublish",
+    "prepublish": "npm run clean && npm run lint && npm run test && npm run build && npm run browserify",
     "clean": "rm -rf dist",
     "build": "tsc",
     "watch": "tsc -w",
