@@ -141,3 +141,20 @@ Connection.ready().then(() => {
 ```javascript
 class RippledWsClient extends XrplClient {} // Then use RippledWsClient
 ```
+
+### Using with a proxy
+
+You can configure your own proxy-enabled http.Agent and pass it as option:
+
+```
+import { HttpsProxyAgent } from "https-proxy-agent";
+
+const agent = new HttpsProxyAgent({
+  host: "proxy.corporate.lan",
+  port: 3128,
+});
+
+const client = new XrplClient("wss://xrplcluster.com", {
+  httpRequestOptions: { agent },
+});
+```

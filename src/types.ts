@@ -1,3 +1,5 @@
+import http = require("http");
+
 export type AnyJson = Record<string, any>;
 
 export interface EventBusEvents {
@@ -46,6 +48,8 @@ export interface WsClientOptions {
   connectAttemptTimeoutSeconds?: number;
   maxConnectionAttempts?: number | null;
   assumeOfflineAfterSeconds?: number;
+  httpHeaders?: http.OutgoingHttpHeaders;
+  httpRequestOptions?: http.RequestOptions;
   // maxPendingCalls: number;
 }
 

@@ -623,7 +623,14 @@ export class XrplClient extends EventEmitter {
       }
 
       if (!this.closed) {
-        const connection = new WebSocket(this.endpoint);
+        const connection = new WebSocket(
+          this.endpoint, // url
+          undefined, // protocols
+          undefined, // origin
+          this.options?.httpHeaders || {}, // headers
+          this.options?.httpRequestOptions || {}, // requestOptions
+          {} // IClientConfig
+        );
 
         // Prevent possible DNS resolve hang, and a custom
         // resolver sucks
