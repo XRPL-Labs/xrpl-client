@@ -1,4 +1,3 @@
-export type AnyJson = Record<string, unknown>;
 export type AnyJson = Record<string, any>;
 
 export interface EventBusEvents {
