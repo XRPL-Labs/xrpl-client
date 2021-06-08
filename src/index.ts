@@ -72,7 +72,7 @@ export class XrplClient extends EventEmitter {
 
   private lastContact?: Date;
 
-  constructor(endpoint: string | string[], options?: WsClientOptions) {
+  constructor(endpoint?: string | string[], options?: WsClientOptions) {
     super();
 
     if (options) {
@@ -123,11 +123,15 @@ export class XrplClient extends EventEmitter {
       return reconnectSeconds;
     };
 
-    this.endpoints = [
-      ...new Set<string>(Array.isArray(endpoint) ? endpoint : [endpoint]),
-    ]
-      .map((uplink) => uplink.trim())
-      .filter((uplink) => uplink.match(/^ws[s]{0,1}:\/\//));
+    this.endpoints = [];
+
+    if (endpoint) {
+      this.endpoints = [
+        ...new Set<string>(Array.isArray(endpoint) ? endpoint : [endpoint]),
+      ]
+        .map((uplink) => uplink.trim())
+        .filter((uplink) => uplink.match(/^ws[s]{0,1}:\/\//));
+    }
 
     if (this.endpoints.length < 1) {
       this.endpoints = [
