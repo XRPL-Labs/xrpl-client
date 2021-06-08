@@ -32,9 +32,11 @@ export interface XrplClientEvents {
   online: () => void;
   offline: () => void;
   round: () => void;
+
   nodeswitch: (endpoint: string) => void;
 
   state: (state: ConnectionState) => void;
+  clusterinfo: (info: ClusterInfo) => void;
 
   message: (message: CallResponse | AnyJson) => void;
   transaction: (transaction: CallResponse | AnyJson) => void;
@@ -162,4 +164,28 @@ export interface ConnectionState {
     owner: number | null;
   };
   secLastContact: number | null;
+}
+
+export interface ClusterInfo extends AnyJson {
+  status: string;
+  type: string;
+  uplinkCount: number;
+  connectMoment: string;
+  uplinkType: string;
+  endpoint: string | null;
+  preferredServer: string;
+  counters: {
+    rxCount: number;
+    txCount: number;
+    rxSize: number;
+    txSize: number;
+    uplinkReconnects: number;
+  };
+  headers: {
+    origin: string;
+    userAgent: string;
+    acceptLanguage: string;
+    xForwardedFor: string;
+    requestUrl: string;
+  };
 }

@@ -19,6 +19,7 @@ import {
   SendOptions,
   EventBus,
   XrplClientEvents,
+  ClusterInfo,
 } from "./types";
 
 export * from "./types";
@@ -60,6 +61,7 @@ export class XrplClient extends EventEmitter {
   private pendingCalls: PendingCall[] = [];
   private subscriptions: PendingCall[] = [];
 
+  private clusterInfo_?: ClusterInfo;
   private serverInfo?: ServerInfoResponse;
   private serverState: ServerState = {
     validatedLedgers: "",
@@ -187,9 +189,27 @@ export class XrplClient extends EventEmitter {
       /**
        * We're firing two commands when we're connected
        */
-      if (!this.closed) {
+      if (!this.closed && this.connection.readyState === WebSocket.OPEN) {
         log("Connection opened :)");
 
+        /**
+         * XRPL Cluster state
+         */
+        if (
+          this.connection.url.match(
+            /^wss:\/\/(xrplcluster\.com|xrpl\.link|xrpl\.ws)/
+          )
+        ) {
+          try {
+            this.connection.send(
+              JSON.stringify({ __api: "state", origin: "xrpl-client@js/ts" })
+            );
+          } catch (e) {}
+        }
+
+        /**
+         * Mandatory messages on connect
+         */
         this.send(
           {
             id: "_WsClient_Internal_Subscription",
@@ -361,7 +381,16 @@ export class XrplClient extends EventEmitter {
             const isInternal =
               message?.id?._Request &&
               String(message.id._Request).match(/^_WsClient_Internal/);
+
             if (!isInternal) {
+              try {
+                const clusterInfo = message as ClusterInfo;
+                if (clusterInfo?.type === "PROXY") {
+                  this.clusterInfo_ = clusterInfo;
+                  this.emit("clusterinfo", this.clusterInfo_);
+                  return;
+                }
+              } catch (e) {}
               logMessage(`Handle <UNKNOWN> Async Message`, {
                 internalId: message?.id?._WsClient,
                 matchingSubscription,
@@ -627,7 +656,9 @@ export class XrplClient extends EventEmitter {
           this.endpoint, // url
           undefined, // protocols
           undefined, // origin
-          this.options?.httpHeaders || {}, // headers
+          Object.assign(this.options?.httpHeaders || {}, {
+            "user-agent": "xrpl-client@js/ts",
+          }), // headers
           this.options?.httpRequestOptions || {}, // requestOptions
           {} // IClientConfig
         );
@@ -656,12 +687,7 @@ export class XrplClient extends EventEmitter {
     this.eventBus.on("flush", flush);
     this.eventBus.on("reconnect", connect);
 
-    // setTimeout(() => {
     this.connection = connect();
-    // }, 2000);
-    // setInterval(() => {
-    //   logNodeInfo("Connection Attempts", this.serverState.connectAttempts);
-    // }, 4000);
   }
 
   ready(): Promise<XrplClient> {
@@ -674,10 +700,10 @@ export class XrplClient extends EventEmitter {
         state.ledger.last
       ) {
         // We're good
-        resolve(this);
+        return resolve(this);
       } else {
+        // Let's wait to make sure we're really connected
         this.on("ledger", () => {
-          // Let's wait to make sure we're really connected
           resolve(this);
         });
       }
@@ -839,5 +865,19 @@ export class XrplClient extends EventEmitter {
   close(): void {
     assert(!this.closed, "Object already in closed state");
     this.eventBus.emit("__WsClient_close");
+  }
+
+  clusterInfo(): Promise<ClusterInfo | false> {
+    return new Promise((resolve, reject) => {
+      if (this.clusterInfo_) {
+        // We're good
+        return resolve(this.clusterInfo_);
+      } else {
+        // Let's wait to make sure we're really connected
+        this.on("clusterinfo", (info) => {
+          resolve(info);
+        });
+      }
+    });
   }
 }
