@@ -1,12 +1,11 @@
 {
   "name": "xrpl-client",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Connect to the XRP Ledger using websockets",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "prepare": "npm run prepublish",
-    "prepublish": "npm run clean && npm run lint && npm run test && npm run build && npm run browserify",
+    "prepare": "npm run clean && npm run lint && npm run test && npm run build && npm run browserify",
     "clean": "rm -rf dist",
     "build": "tsc",
     "watch": "tsc -w",
