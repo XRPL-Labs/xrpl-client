@@ -12,12 +12,12 @@ A client connection can be constructed with the exported `XrplClient` class:
 
 ```typescript
 import { XrplClient } from "xrpl-client";
-const client = new XrplClient(/* endpoint(s), options */);
+const client = new XrplClient();
 // ^^ No arguments: defaults to one endpoint: wss://xrplcluster.com
 // with `maxConnectionAttempts` option `null` (try forever)
 ```
 
-If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com). Alternatively, two arguments can be provided:
+If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com), options will have their default values outlined below. Alternatively, two arguments can be provided:
 
 ###### Arguments
 
@@ -32,7 +32,7 @@ Available options are:
 - `maxConnectionAttempts`, `Number` | `null` » default **null** in case of one endpoint, or **5** if an array with endpoints is provided, if (when initially connecting or reconnecting) no (new) connection could be setup in this attempts (see: `connectAttemptTimeoutSeconds` per call) consider the connection dead. Cancel all connect/reconnect attempts, clear the command buffer. An error will be thrown.
 - `connectAttemptTimeoutSeconds`, `Number` » default **4**, this setting is the max. delay between reconnect attempts, if no connection could be setup to the XRPL node. A backoff starting at one second, growing with 20% per attempt until this value is reached will be used.
 
-Sample with a custom node & option:
+Sample with custom nodes & options:
 
 ```typescript
 import { XrplClient } from "xrpl-client";
@@ -40,11 +40,15 @@ const client = new XrplClient(
   ["ws://localhost:1337", "wss://xrplcluster.com"],
   {
     assumeOfflineAfterSeconds: 15,
-    //  maxConnectionAttempts: 5,
-    connectAttemptTimeoutSeconds: 5,
+    maxConnectionAttempts: 4,
+    connectAttemptTimeoutSeconds: 2,
   }
 );
 ```
+
+In this example this lib. will:
+- First try to connect to the node running at localhost and after `4` reconnect attempts it'll try the next node (xrplcluster.com)
+- Once connected, if no new ledger information has been received from the node after 15 seconds (at any given moment) the client/connection/endpoint is considered no longer connected (offline) and the connection sequence will start again, starting with max. 4 attempts to the node running at localhost.
 
 #### Methods:
 
