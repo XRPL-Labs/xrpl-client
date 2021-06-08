@@ -660,7 +660,10 @@ export class XrplClient extends EventEmitter {
             "user-agent": "xrpl-client@js/ts",
           }), // headers
           this.options?.httpRequestOptions || {}, // requestOptions
-          {} // IClientConfig
+          {
+            maxReceivedFrameSize: 0x80000000, // 2GB
+            maxReceivedMessageSize: 0x200000000, // 8GB
+          } // IClientConfig
         );
 
         // Prevent possible DNS resolve hang, and a custom
