@@ -14,16 +14,15 @@ A client connection can be constructed with the exported `XrplClient` class:
 import { XrplClient } from "xrpl-client";
 const client = new XrplClient();
 //             ^^ No arguments: defaults to one endpoint:
-//                wss://xrplcluster.com
-//             with `maxConnectionAttempts` option `null`
-//                (= try forever)
+//     ['wss://xrplcluster.com', 'wss://xrpl.link', 'wss://s2.ripple.com']
+//             with `maxConnectionAttempts` option `null` (= try forever)
 ```
 
-If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com). Alternatively, two arguments can be provided:
+If no argument is provided, the default endpoint this lib. will connect to is [`wss://xrplcluster.com`](https://xrplcluster.com), wss://xrpl.link (fallback) and finally wss://s2.ripple.com. Alternatively, two arguments can be provided:
 
 ###### Arguments
 
-1. (string | array) The WebSocket endpoint to connect to (e.g. your own node) as a `string`, or an array (`string[]`) with multiple endpoints used in specified order
+1. (string | array) The WebSocket endpoint to connect to (e.g. your own node) as a `string`, or an array (`string[]`) with multiple endpoints used in specified order. Empty string or array if you want to use the default nodes, but specify custom options using the second param.:
 2. (object) Global options (type: WsClientOptions)
 
 ###### Options

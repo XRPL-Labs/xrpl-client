@@ -72,10 +72,7 @@ export class XrplClient extends EventEmitter {
 
   private lastContact?: Date;
 
-  constructor(
-    endpoint: string | string[] = "wss://xrplcluster.com",
-    options?: WsClientOptions
-  ) {
+  constructor(endpoint: string | string[], options?: WsClientOptions) {
     super();
 
     if (options) {
@@ -133,7 +130,15 @@ export class XrplClient extends EventEmitter {
       .filter((uplink) => uplink.match(/^ws[s]{0,1}:\/\//));
 
     if (this.endpoints.length < 1) {
-      throw new Error("No valid WebSocket endpoint(s) specified");
+      this.endpoints = [
+        "wss://xrplcluster.com",
+        "wss://xrpl.link",
+        "wss://s2.ripple.com",
+      ];
+      logWarning(
+        "No valid WebSocket endpoint(s) specified, falling back to defaults",
+        this.endpoints
+      );
     }
 
     this.endpoint = this.endpoints[0].trim();
