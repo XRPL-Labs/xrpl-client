@@ -158,3 +158,12 @@ const client = new XrplClient("wss://xrplcluster.com", {
   httpRequestOptions: { agent },
 });
 ```
+
+### Development & Debugging
+
+To see all debugging info, run the compiled version with the `DEBUG` env. var:
+
+```bash
+tsc
+DEBUG=xrplclient* node someFile.js
+```
