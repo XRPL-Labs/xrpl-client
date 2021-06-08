@@ -95,16 +95,10 @@ export class XrplClient extends EventEmitter {
       livelinessCheck = setTimeout(() => {
         // Only if the connection ever was online to begin with
         if (this.uplinkReady) {
-          logWarning(
-            "----- CONNECTION TIMEOUT, NO LEDER INFO RECEIVED FOR ",
-            seconds,
-            "SECONDS -----"
-          );
+          logWarning(`Conn. TIMEOUT, no ledger for ${seconds} sec.`);
           try {
             this.connection?.close();
-          } catch (e) {
-            //
-          }
+          } catch (e) {}
         }
       }, seconds);
     };
@@ -128,16 +122,9 @@ export class XrplClient extends EventEmitter {
         1.5,
         (this.serverState.connectAttempts + 1) * factor
       );
-      // log(
-      //   `___________________ ${reconnectSeconds} reconnectSeconds ________________`
-      // );
 
       return reconnectSeconds;
     };
-
-    // setInterval(() => {
-    //   log("» Pending Call Length", this.pendingCalls.length);
-    // }, 5000);
 
     this.endpoints = [
       ...new Set<string>(Array.isArray(endpoint) ? endpoint : [endpoint]),
@@ -219,11 +206,6 @@ export class XrplClient extends EventEmitter {
           // If timing: came online after close: kill
         }
       }
-
-      // setTimeout(() => {
-      //   // this.connection.close();
-      //   // (this.connection as any).removeEventListener("message", WsMessage);
-      // }, 5000);
     };
 
     const WsClose = (event: ICloseEvent): void => {
