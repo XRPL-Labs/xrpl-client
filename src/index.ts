@@ -177,7 +177,6 @@ export class XrplClient extends EventEmitter {
         this.uplinkReady = true;
         this.eventBus.emit("flush");
         this.emit("online");
-        this.endpoint = this.endpoints[0];
         this.emit("state", this.getState());
       }
     };
@@ -196,9 +195,7 @@ export class XrplClient extends EventEmitter {
          * XRPL Cluster state
          */
         if (
-          this.connection.url.match(
-            /^wss:\/\/(xrplcluster\.com|xrpl\.link|xrpl\.ws)/
-          )
+          this.endpoint.match(/^wss:\/\/(xrplcluster\.com|xrpl\.link|xrpl\.ws)/)
         ) {
           try {
             this.connection.send(
@@ -244,6 +241,8 @@ export class XrplClient extends EventEmitter {
       if (this.uplinkReady) {
         // Was online
         this.emit("offline");
+        // Was online, so start a new cycle instead of trying the next node
+        this.endpoint = this.endpoints[0];
       }
       this.uplinkReady = false;
       this.serverInfo = undefined;
@@ -827,7 +826,7 @@ export class XrplClient extends EventEmitter {
         version: this.serverInfo?.result?.info?.build_version || "",
         uptime: this.serverInfo?.result?.info?.uptime || 0,
         publicKey: this.serverInfo?.result?.info?.pubkey_node || "",
-        uri: this.connection.url,
+        uri: this.endpoint,
       },
       ledger: {
         last: Number(
