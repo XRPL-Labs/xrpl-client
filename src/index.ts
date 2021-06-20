@@ -555,8 +555,11 @@ export class XrplClient extends EventEmitter {
     };
 
     const close = (error?: Error): void => {
-      this.closed = true;
       log("Closing connection");
+      this.emit("close");
+
+      this.closed = true;
+
       WsCleanup();
 
       try {
