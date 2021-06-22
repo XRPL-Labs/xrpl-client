@@ -45,6 +45,7 @@ export class XrplClient extends EventEmitter {
   private eventBus: EventBus = new EventEmitter();
 
   private closed: boolean = false;
+  private destroyed: boolean = false;
   private uplinkReady: boolean = false;
 
   private options: WsClientOptions = {
@@ -556,6 +557,8 @@ export class XrplClient extends EventEmitter {
     };
 
     const reinstate = (): void => {
+      assert(!this.destroyed, "Object is in destroyed state");
+
       log("Reinstating...");
       this.closed = false;
       alive();
@@ -582,6 +585,8 @@ export class XrplClient extends EventEmitter {
     };
 
     const destroy = (error?: Error): void => {
+      this.destroyed = true;
+
       close(error);
 
       WsCleanup();
@@ -764,8 +769,8 @@ export class XrplClient extends EventEmitter {
       sendOptions,
     };
 
-    if (this.closed) {
-      promiseCallables.reject(new Error("Client in closed state"));
+    if (this.destroyed) {
+      promiseCallables.reject(new Error("Client in destroyed state"));
       return promise;
     }
 
