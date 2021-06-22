@@ -85,6 +85,7 @@ export class XrplClient extends EventEmitter {
      * Alive timer
      */
     let livelinessCheck: ReturnType<typeof setTimeout>;
+
     const alive = (): void => {
       clearTimeout(livelinessCheck);
       const seconds =
@@ -554,13 +555,18 @@ export class XrplClient extends EventEmitter {
       });
     };
 
+    const reinstate = (): void => {
+      log("Reinstating...");
+      this.closed = false;
+      alive();
+      this.connection = connect();
+    };
+
     const close = (error?: Error): void => {
       log("Closing connection");
       this.emit("close");
 
       this.closed = true;
-
-      WsCleanup();
 
       try {
         this.connection.close();
@@ -569,6 +575,17 @@ export class XrplClient extends EventEmitter {
       }
 
       clearTimeout(livelinessCheck);
+
+      if (error) {
+        this.emit("error", error);
+      }
+    };
+
+    const destroy = (error?: Error): void => {
+      close(error);
+
+      WsCleanup();
+
       this.subscriptions.forEach((subscription) => {
         subscription.promiseCallables.reject(
           new Error("Class (connection) hard close requested")
@@ -581,13 +598,11 @@ export class XrplClient extends EventEmitter {
       });
 
       this.eventBus.off("__WsClient_call", call);
+      this.eventBus.off("__WsClient_destroy", destroy);
       this.eventBus.off("__WsClient_close", close);
+      this.eventBus.off("__WsClient_reinstate", reinstate);
       this.eventBus.off("flush", flush);
       this.eventBus.off("reconnect", connect);
-
-      if (error) {
-        this.emit("error", error);
-      }
     };
 
     const WsCleanup = (): void => {
@@ -688,7 +703,9 @@ export class XrplClient extends EventEmitter {
     };
 
     this.eventBus.on("__WsClient_call", call);
+    this.eventBus.on("__WsClient_destroy", destroy);
     this.eventBus.on("__WsClient_close", close);
+    this.eventBus.on("__WsClient_reinstate", reinstate);
     this.eventBus.on("flush", flush);
     this.eventBus.on("reconnect", connect);
 
@@ -868,8 +885,21 @@ export class XrplClient extends EventEmitter {
   }
 
   close(): void {
-    assert(!this.closed, "Object already in closed state");
+    // assert(!this.closed, "Object already in closed state");
+    log(`> CLOSE`);
     this.eventBus.emit("__WsClient_close");
+  }
+
+  reinstate(): void {
+    // assert(!this.closed, "Object already reinstated state");
+    log(`> REINSTATE`);
+    this.eventBus.emit("__WsClient_reinstate");
+  }
+
+  destroy(): void {
+    // assert(!this.closed, "Object already in destroyed state");
+    log(`> DESTROY`);
+    this.eventBus.emit("__WsClient_destroy");
   }
 
   clusterInfo(): Promise<ClusterInfo | false> {

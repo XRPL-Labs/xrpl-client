@@ -52,7 +52,9 @@ const client = new XrplClient(
 - `send({ command: "..."}, {SendOptions})` » `Promise<AnyJson | CallResponse>` » Send a `comand` to the connected XRPL node.
 - `ready()` » `Promise<self>` » fires when you're fully connected. While the `state` event (and `getState()` method) only return the WebSocket online state, `ready()` will only return (async) if the first ledger data has been received and the last ledger index is known.
 - `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
-- close() » `void` » Fully close the entire object (can't be used again).
+- close() » `void` » Close the connection, but allow the object to be used again (using `reinstate()`).
+- reinstate() » `void` » Reconnect the object when in closed state (after calling `close()`).
+- destroy() » `void` » Fully close the entire object (can't be used again).
 
 #### Send options
 

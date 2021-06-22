@@ -5,6 +5,8 @@ export type AnyJson = Record<string, any>;
 export interface EventBusEvents {
   __WsClient_call: (call: PendingCall) => void;
   __WsClient_close: () => void;
+  __WsClient_reinstate: () => void;
+  __WsClient_destroy: () => void;
   reconnect: () => void;
   flush: () => void;
 }
