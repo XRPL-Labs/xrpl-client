@@ -54,6 +54,8 @@ export interface WsClientOptions {
   assumeOfflineAfterSeconds?: number;
   httpHeaders?: http.OutgoingHttpHeaders;
   httpRequestOptions?: http.RequestOptions;
+  feeDropsDefault?: number;
+  feeDropsMax?: number;
   // maxPendingCalls: number;
 }
 

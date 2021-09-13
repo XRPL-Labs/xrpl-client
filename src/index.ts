@@ -33,6 +33,9 @@ const logNodeInfo = log.extend("node");
 const connectAttemptTimeoutSeconds = 3;
 const assumeOfflineAfterSeconds = 15;
 const maxConnectionAttempts = null;
+const feeCushion = 1.2;
+const feeDropsDefault = 12;
+const feeDropsMax = 3600;
 
 export declare interface XrplClient {
   on<U extends keyof XrplClientEvents>(
@@ -52,6 +55,8 @@ export class XrplClient extends EventEmitter {
     connectAttemptTimeoutSeconds,
     assumeOfflineAfterSeconds,
     maxConnectionAttempts,
+    feeDropsDefault,
+    feeDropsMax,
   };
 
   private callId: number = 0;
@@ -298,14 +303,15 @@ export class XrplClient extends EventEmitter {
           );
         }
 
-        const feeCushion = 1.2;
         const fee =
-          serverInfo.result.info.load_factor *
-          Number(serverInfo.result.info.validated_ledger?.base_fee_xrp) *
+          Number(
+            serverInfo.result.info?.validated_ledger?.base_fee_xrp ||
+              (this.options.feeDropsDefault || feeDropsDefault) / 1_000_000
+          ) *
           1_000_000 *
           feeCushion;
 
-        if (fee) {
+        if (fee && fee <= (this.options.feeDropsMax || feeDropsMax)) {
           this.serverState.fee.push({
             moment: new Date(),
             value: fee,
@@ -868,11 +874,15 @@ export class XrplClient extends EventEmitter {
         last:
           this.serverState.fee
             .slice(-1)
-            .map((feeRecord) => feeRecord.value)[0] || null,
+            .map((feeRecord) => feeRecord.value)[0] ||
+          this.options.feeDropsDefault ||
+          feeDropsDefault,
         avg:
           this.serverState.fee
             .map((feeRecord) => feeRecord.value)
-            .reduce((a, b) => a + b, 0) / this.serverState.fee.length || null,
+            .reduce((a, b) => a + b, 0) / this.serverState.fee.length ||
+          this.options.feeDropsDefault ||
+          feeDropsDefault,
         secAgo:
           Number(new Date()) / 1000 -
             this.serverState.fee

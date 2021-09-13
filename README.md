@@ -32,6 +32,8 @@ Available options are:
 - `assumeOfflineAfterSeconds`, `Number` » default **150**, this setting will check if the XRPL node on the other end of the connection is alive and sending regular `server_info` responses (this lib. queries for them). After the timeout, the lib. will disconnect from the node and try to reconnect.
 - `maxConnectionAttempts`, `Number` | `null` » default **null** in case of one endpoint, or **3** if an array with endpoints is provided, if (when initially connecting or reconnecting) no (new) connection could be setup in this attempts (see: `connectAttemptTimeoutSeconds` per call) consider the connection dead. Cancel all connect/reconnect attempts, clear the command buffer. An error will be thrown.
 - `connectAttemptTimeoutSeconds`, `Number` » default **3**, this setting is the max. delay between reconnect attempts, if no connection could be setup to the XRPL node. A backoff starting at one second, growing with 20% per attempt until this value is reached will be used.
+- `feeDropsDefault`, `Number` » default **12**, The min. amount of node reported transaction fee (in drops) respected for the `getState()` reported last/avg fee amount.
+- `feeDropsMax`, `Number` » default **3600**, The max. amount of node reported transaction fee (in drops) respected for the `getState()` reported last/avg fee amount.
 
 Sample with a custom node & option:
 
