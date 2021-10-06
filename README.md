@@ -62,7 +62,7 @@ const client = new XrplClient(
 
 The `send({ comand: "..." })` method allows you to set these options (second argument, object):
 
-- `timeoutSeconds`, `Boolean` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
+- `timeoutSeconds`, `Number` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
 - `timeoutStartsWhenOnline`, `Number` » The timeout (see `timeoutSeconds`) will start when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node), so when your command has been issued by this lib. to the XRPL node on the other end of the connection.
 - `sendIfNotReady`, `Boolean` » Your commands will be sent to the XRPL node on the other end of the connection only when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node). Adding this option (`true`) will send your commands _after_ the WebSocket has been connected, but possibly _before_ a valid `server_info` response has been received by the XRPL node connected to.
 - `noReplayAfterReconnect`, `Boolean` » When adding a subscription (resulting in async. updates) like a `subscribe` or `path_find` command, when reconnected your subscription commands will automaticaly replay to the newly connected node. Providing a `false` to this option will prevent your commands from being replayed when reconnected.
