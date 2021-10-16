@@ -6,6 +6,11 @@ Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket clie
 
 This client implements a check for a working XRPL connection: the WebSocket being simply online isn't enough to satisfy the online / offline detection of this lib. After connecting, this lib. will issue a `server_info` command to the other connected node. Only if a valid response is retrieved the connection will be marked as online.
 
+### A note on connectivity vs. signing
+
+Please note: this lib only provides connectivity to XRPL nodes. To sign transactions, please take a look at `xrpl-accountlib`. Here's an example on how these two libs can work together:
+https://gist.github.com/WietseWind/557a5c11fa0d474468e8c9c54e3e5b93
+
 #### Constructor & options
 
 A client connection can be constructed with the exported `XrplClient` class:
