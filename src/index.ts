@@ -381,7 +381,7 @@ export class XrplClient extends EventEmitter {
             matchingSubscription?.request?.streams.indexOf("ledger") > -1
           ) {
             logMessage("Async", "subscription:ledger");
-            this.emit("ledger", message);
+            this.emit("ledger", message?.result ? message?.result : message);
           } else if (matchingSubscription) {
             // Don't log `Unknown` as we know this
           } else {
