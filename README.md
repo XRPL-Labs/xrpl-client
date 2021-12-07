@@ -6,6 +6,11 @@ Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket clie
 
 This client implements a check for a working XRPL connection: the WebSocket being simply online isn't enough to satisfy the online / offline detection of this lib. After connecting, this lib. will issue a `server_info` command to the other connected node. Only if a valid response is retrieved the connection will be marked as online.
 
+### A note on connectivity vs. signing
+
+Please note: this lib only provides connectivity to XRPL nodes. To sign transactions, please take a look at `xrpl-accountlib`. Here's an example on how these two libs can work together:
+https://gist.github.com/WietseWind/557a5c11fa0d474468e8c9c54e3e5b93
+
 #### Constructor & options
 
 A client connection can be constructed with the exported `XrplClient` class:
@@ -62,7 +67,7 @@ const client = new XrplClient(
 
 The `send({ comand: "..." })` method allows you to set these options (second argument, object):
 
-- `timeoutSeconds`, `Boolean` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
+- `timeoutSeconds`, `Number` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
 - `timeoutStartsWhenOnline`, `Number` » The timeout (see `timeoutSeconds`) will start when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node), so when your command has been issued by this lib. to the XRPL node on the other end of the connection.
 - `sendIfNotReady`, `Boolean` » Your commands will be sent to the XRPL node on the other end of the connection only when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node). Adding this option (`true`) will send your commands _after_ the WebSocket has been connected, but possibly _before_ a valid `server_info` response has been received by the XRPL node connected to.
 - `noReplayAfterReconnect`, `Boolean` » When adding a subscription (resulting in async. updates) like a `subscribe` or `path_find` command, when reconnected your subscription commands will automaticaly replay to the newly connected node. Providing a `false` to this option will prevent your commands from being replayed when reconnected.
