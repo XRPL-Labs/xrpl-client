@@ -344,11 +344,11 @@ export class XrplClient extends EventEmitter {
 
         this.emit("message", message);
 
-        if (message?.type === "ledgerClosed") {
+        if (message?.type === "ledgerClosed" && typeof message?.validated_ledgers === "string") {
           logMessage("Async", message.type);
 
           Object.assign(this.serverState, {
-            validatedLedgers: message?.validated_ledgers,
+            validatedLedgers: message.validated_ledgers,
             reserveBase: Number(message?.reserve_base) / 1_000_000 || null,
             reserveInc: Number(message?.reserve_inc) / 1_000_000 || null,
           });
