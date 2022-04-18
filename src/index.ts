@@ -917,6 +917,11 @@ export class XrplClient extends EventEmitter {
     this.eventBus.emit("__WsClient_destroy");
   }
 
+  nodeswitch(): void {
+    log(`> NODESWITCH`);
+    this.emit("nodeswitch", this.endpoint);
+  }
+
   clusterInfo(): Promise<ClusterInfo | false> {
     return new Promise((resolve, reject) => {
       if (this.clusterInfo_) {
