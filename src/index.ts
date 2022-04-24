@@ -20,6 +20,7 @@ import {
   EventBus,
   XrplClientEvents,
   ClusterInfo,
+  ConnectReinstateOptions,
 } from "./types";
 
 export * from "./types";
@@ -93,6 +94,7 @@ export class XrplClient extends EventEmitter {
     let livelinessCheck: ReturnType<typeof setTimeout>;
 
     const alive = (): void => {
+      // log('Start alive timer')
       clearTimeout(livelinessCheck);
       const seconds =
         Number(
@@ -562,12 +564,20 @@ export class XrplClient extends EventEmitter {
       });
     };
 
-    const reinstate = (): void => {
+    const reinstate = (options?: ConnectReinstateOptions): void => {
       assert(!this.destroyed, "Object is in destroyed state");
 
-      log("Reinstating...");
-      this.closed = false;
-      alive();
+      log("Reinstating..., options:", options || {});
+
+      if (options?.forceNextUplink) {
+        this.uplinkReady = false; // Prevents going back to endpoint[0]
+        clearTimeout(livelinessCheck)
+        selectNextUplink()
+      } else {
+        this.closed = false;
+        alive();
+      }
+
       this.connection = connect();
     };
 
@@ -624,6 +634,21 @@ export class XrplClient extends EventEmitter {
       (this.connection as any).removeEventListener("close", WsClose);
     };
 
+    const selectNextUplink = () => {
+      const nextEndpointIndex = this.endpoints.indexOf(this.endpoint) + 1;
+      logWarning("--- Current endpoint", this.endpoint);
+      this.endpoint =
+        this.endpoints[
+          nextEndpointIndex >= this.endpoints.length ? 0 : nextEndpointIndex
+        ];
+      logWarning("--- New endpoint", this.endpoint);
+      this.serverState.connectAttempts = 0;
+      this.emit("nodeswitch", this.endpoint);
+      if (nextEndpointIndex >= this.endpoints.length) {
+        this.emit("round");
+      }
+    }
+
     const connect = (): WebSocket => {
       try {
         this.connection.close();
@@ -646,6 +671,7 @@ export class XrplClient extends EventEmitter {
           this.serverState.connectAttempts,
           this.options?.maxConnectionAttempts
         );
+
         log(
           this.endpoint,
           this.endpoints,
@@ -659,18 +685,7 @@ export class XrplClient extends EventEmitter {
           logWarning(
             "Multiple endpoints, max. connection attempts exceeded. Switch endpoint."
           );
-          const nextEndpointIndex = this.endpoints.indexOf(this.endpoint) + 1;
-          logWarning("--- Current endpoint", this.endpoint);
-          this.endpoint =
-            this.endpoints[
-              nextEndpointIndex >= this.endpoints.length ? 0 : nextEndpointIndex
-            ];
-          logWarning("--- New endpoint", this.endpoint);
-          this.serverState.connectAttempts = 0;
-          this.emit("nodeswitch", this.endpoint);
-          if (nextEndpointIndex >= this.endpoints.length) {
-            this.emit("round");
-          }
+          selectNextUplink()
         } else {
           logWarning(
             "Only one valid endpoint, after the max. connection attempts: game over"
@@ -905,10 +920,10 @@ export class XrplClient extends EventEmitter {
     this.eventBus.emit("__WsClient_close");
   }
 
-  reinstate(): void {
+  reinstate(options?: ConnectReinstateOptions): void {
     // assert(!this.closed, "Object already reinstated state");
     log(`> REINSTATE`);
-    this.eventBus.emit("__WsClient_reinstate");
+    this.eventBus.emit("__WsClient_reinstate", options);
   }
 
   destroy(): void {

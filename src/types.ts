@@ -5,7 +5,7 @@ export type AnyJson = Record<string, any>;
 export interface EventBusEvents {
   __WsClient_call: (call: PendingCall) => void;
   __WsClient_close: () => void;
-  __WsClient_reinstate: () => void;
+  __WsClient_reinstate: (options?: ConnectReinstateOptions) => void;
   __WsClient_destroy: () => void;
   reconnect: () => void;
   flush: () => void;
@@ -80,6 +80,10 @@ export type PseudoId = {
   _WsClient: number;
   _Request?: number | string;
 };
+
+export interface ConnectReinstateOptions {
+  forceNextUplink?: boolean
+}
 
 export interface CallResponse extends AnyJson {
   id?: PseudoId;

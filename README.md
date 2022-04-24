@@ -60,7 +60,7 @@ const client = new XrplClient(
 - `ready()` » `Promise<self>` » fires when you're fully connected. While the `state` event (and `getState()` method) only return the WebSocket online state, `ready()` will only return (async) if the first ledger data has been received and the last ledger index is known.
 - `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
 - close() » `void` » Close the connection, but allow the object to be used again (using `reinstate()`).
-- reinstate() » `void` » Reconnect the object when in closed state (after calling `close()`).
+- reinstate(options?: {forceNextUplink: boolean}) » `void` » Reconnect the object when in closed state (after calling `close()`). By passing `forceNextUplink: true` (default false) the connection will be reinstated to the next uplink instead of starting again from the first provided uplink (constructor).
 - destroy() » `void` » Fully close the entire object (can't be used again).
 
 #### Send options
