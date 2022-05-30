@@ -65,7 +65,7 @@ const client = new XrplClient(
 
 #### Send options
 
-The `send({ comand: "..." })` method allows you to set these options (second argument, object):
+The `send({ command: "..." })` method allows you to set these options (second argument, object):
 
 - `timeoutSeconds`, `Number` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
 - `timeoutStartsWhenOnline`, `Number` » The timeout (see `timeoutSeconds`) will start when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node), so when your command has been issued by this lib. to the XRPL node on the other end of the connection.
