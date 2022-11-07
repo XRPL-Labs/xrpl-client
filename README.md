@@ -57,7 +57,7 @@ const client = new XrplClient(
 
 #### Methods:
 
-- `send({ command: "..."}, {SendOptions})` » `Promise<AnyJson | CallResponse>` » Send a `comand` to the connected XRPL node.
+- `send({ command: "..."}, {SendOptions})` » `Promise<AnyJson | CallResponse>` » Send a `cmomand` to the connected XRPL node.
 - `ready()` » `Promise<self>` » fires when you're fully connected. While the `state` event (and `getState()` method) only return the WebSocket online state, `ready()` will only return (async) if the first ledger data has been received and the last ledger index is known.
 - `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
 - close() » `void` » Close the connection, but allow the object to be used again (using `reinstate()`).
@@ -66,7 +66,7 @@ const client = new XrplClient(
 
 #### Send options
 
-The `send({ comand: "..." })` method allows you to set these options (second argument, object):
+The `send({ command: "..." })` method allows you to set these options (second argument, object):
 
 - `timeoutSeconds`, `Number` » The returned Promise will be rejected if a response hasn't been received within this amount of seconds. This timeout starts when the command is issued by your code, no matter the connection state (online or offline, possibly waiting for a connecftion)
 - `timeoutStartsWhenOnline`, `Number` » The timeout (see `timeoutSeconds`) will start when the connection has been marked online (WebSocket connected, `server_info` received from the XRPL node), so when your command has been issued by this lib. to the XRPL node on the other end of the connection.
