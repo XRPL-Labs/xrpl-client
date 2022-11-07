@@ -1,4 +1,4 @@
-import assert from "assert";
+import { default as assert } from "assert";
 import { EventEmitter } from "events";
 import { debug as Debug } from "debug";
 import {
@@ -21,7 +21,9 @@ import {
   XrplClientEvents,
   ClusterInfo,
   ConnectReinstateOptions,
+  serverInfoAndState,
 } from "./types";
+import { isContext } from "vm";
 
 export * from "./types";
 
@@ -37,6 +39,7 @@ const maxConnectionAttempts = null;
 const feeCushion = 1.2;
 const feeDropsDefault = 12;
 const feeDropsMax = 3600;
+const tryAllNodes = false;
 
 export declare interface XrplClient {
   on<U extends keyof XrplClientEvents>(
@@ -44,6 +47,32 @@ export declare interface XrplClient {
     listener: XrplClientEvents[U]
   ): this;
 }
+
+const endpointParser = (endpoint?: string | string[]): string[] => {
+  let endpoints: string[] = [];
+
+  if (endpoint) {
+    endpoints = [
+      ...new Set<string>(Array.isArray(endpoint) ? endpoint : [endpoint]),
+    ]
+      .map((uplink) => uplink.trim())
+      .filter((uplink) => uplink.match(/^ws[s]{0,1}:\/\//));
+  }
+
+  if (endpoints.length < 1) {
+    endpoints = [
+      "wss://xrplcluster.com",
+      "wss://xrpl.link",
+      "wss://s2.ripple.com",
+    ];
+    logWarning(
+      "No valid WebSocket endpoint(s) specified, falling back to defaults",
+      endpoints
+    );
+  }
+
+  return endpoints;
+};
 
 export class XrplClient extends EventEmitter {
   private eventBus: EventBus = new EventEmitter();
@@ -58,12 +87,13 @@ export class XrplClient extends EventEmitter {
     maxConnectionAttempts,
     feeDropsDefault,
     feeDropsMax,
+    tryAllNodes,
   };
 
   private callId: number = 0;
   private endpoints: string[];
   private endpoint: string;
-  private connection: WebSocket;
+  private connection?: WebSocket;
 
   private pendingCalls: PendingCall[] = [];
   private subscriptions: PendingCall[] = [];
@@ -88,6 +118,8 @@ export class XrplClient extends EventEmitter {
       Object.assign(this.options, options);
     }
 
+    this.endpoints = endpointParser(endpoint);
+
     /**
      * Alive timer
      */
@@ -105,7 +137,8 @@ export class XrplClient extends EventEmitter {
         if (this.uplinkReady) {
           logWarning(`Conn. TIMEOUT, no ledger for ${seconds} sec.`);
           try {
-            this.connection?.close();
+            log("Close #6");
+            this?.connection?.close();
           } catch (e) {}
         }
       }, seconds);
@@ -133,28 +166,6 @@ export class XrplClient extends EventEmitter {
 
       return reconnectSeconds;
     };
-
-    this.endpoints = [];
-
-    if (endpoint) {
-      this.endpoints = [
-        ...new Set<string>(Array.isArray(endpoint) ? endpoint : [endpoint]),
-      ]
-        .map((uplink) => uplink.trim())
-        .filter((uplink) => uplink.match(/^ws[s]{0,1}:\/\//));
-    }
-
-    if (this.endpoints.length < 1) {
-      this.endpoints = [
-        "wss://xrplcluster.com",
-        "wss://xrpl.link",
-        "wss://s2.ripple.com",
-      ];
-      logWarning(
-        "No valid WebSocket endpoint(s) specified, falling back to defaults",
-        this.endpoints
-      );
-    }
 
     this.endpoint = this.endpoints[0].trim();
 
@@ -197,7 +208,7 @@ export class XrplClient extends EventEmitter {
       /**
        * We're firing two commands when we're connected
        */
-      if (!this.closed && this.connection.readyState === WebSocket.OPEN) {
+      if (!this.closed && this?.connection?.readyState === WebSocket.OPEN) {
         log("Connection opened :)");
 
         /**
@@ -207,7 +218,7 @@ export class XrplClient extends EventEmitter {
           this.endpoint.match(/^wss:\/\/(xrplcluster\.com|xrpl\.link|xrpl\.ws)/)
         ) {
           try {
-            this.connection.send(
+            this?.connection?.send(
               JSON.stringify({ __api: "state", origin: "xrpl-client@js/ts" })
             );
           } catch (e) {}
@@ -236,7 +247,8 @@ export class XrplClient extends EventEmitter {
         }, ignore);
       } else {
         try {
-          this.connection.close();
+          log("Close #1");
+          this?.connection?.close();
         } catch (e) {
           // If timing: came online after close: kill
         }
@@ -274,15 +286,42 @@ export class XrplClient extends EventEmitter {
       }
     };
 
-    const handleServerInfo = (message: CallResponse): void => {
+    const handleServerInfo = (
+      message: CallResponse,
+      returnOnly = false
+    ): void | serverInfoAndState => {
       if (message?.result?.info) {
+        const serverState = returnOnly
+          ? Object.assign({}, this.serverState)
+          : this.serverState;
+
         const serverInfo = message as ServerInfoResponse;
+
         if (!this.serverInfo) {
-          logNodeInfo("Connected, server_info:", {
-            pubkey_node: serverInfo.result.info.pubkey_node,
-            build_version: serverInfo.result.info.build_version,
-            complete_ledgers: serverInfo.result.info.complete_ledgers,
-          });
+          if (!returnOnly) {
+            logNodeInfo("Connected, server_info:", {
+              pubkey_node: serverInfo.result.info.pubkey_node,
+              build_version: serverInfo.result.info.build_version,
+              complete_ledgers: serverInfo.result.info.complete_ledgers,
+            });
+          }
+        }
+
+        if (serverInfo?.result?.info?.validated_ledger?.reserve_base_xrp) {
+          serverState.reserveBase =
+            Number(serverInfo.result.info.validated_ledger.reserve_base_xrp) ||
+            null;
+        }
+
+        if (serverInfo?.result?.info?.validated_ledger?.reserve_inc_xrp) {
+          serverState.reserveInc =
+            Number(serverInfo.result.info.validated_ledger.reserve_inc_xrp) ||
+            null;
+        }
+
+        if (serverInfo?.result?.info?.complete_ledgers) {
+          serverState.validatedLedgers =
+            serverInfo.result.info.complete_ledgers;
         }
 
         const msRoundTrip =
@@ -294,15 +333,12 @@ export class XrplClient extends EventEmitter {
           );
 
         if (msRoundTrip) {
-          this.serverState.latency.push({
+          serverState.latency.push({
             moment: new Date(),
             value: msRoundTrip,
           });
 
-          this.serverState.latency.splice(
-            0,
-            this.serverState.latency.length - 10
-          );
+          serverState.latency.splice(0, serverState.latency.length - 10);
         }
 
         const fee =
@@ -314,15 +350,19 @@ export class XrplClient extends EventEmitter {
           feeCushion;
 
         if (fee && fee <= (this.options.feeDropsMax || feeDropsMax)) {
-          this.serverState.fee.push({
+          serverState.fee.push({
             moment: new Date(),
             value: fee,
           });
 
-          this.serverState.fee.splice(0, this.serverState.fee.length - 5);
+          serverState.fee.splice(0, serverState.fee.length - 5);
         }
 
-        this.serverInfo = serverInfo;
+        if (!returnOnly) {
+          this.serverInfo = serverInfo;
+        } else {
+          return { serverInfo, serverState };
+        }
       }
     };
 
@@ -346,7 +386,10 @@ export class XrplClient extends EventEmitter {
 
         this.emit("message", message);
 
-        if (message?.type === "ledgerClosed" && typeof message?.validated_ledgers === "string") {
+        if (
+          message?.type === "ledgerClosed" &&
+          typeof message?.validated_ledgers === "string"
+        ) {
           logMessage("Async", message.type);
 
           Object.assign(this.serverState, {
@@ -515,7 +558,7 @@ export class XrplClient extends EventEmitter {
       }
       try {
         // log(call.request);
-        this.connection.send(JSON.stringify(call.request));
+        this?.connection?.send(JSON.stringify(call.request));
         if (call?.sendOptions?.timeoutStartsWhenOnline) {
           // logWarning("APPLY TIMEOUT ONLY AFTER GOING ONLINE");
           applyCallTimeout(call);
@@ -571,14 +614,14 @@ export class XrplClient extends EventEmitter {
 
       if (options?.forceNextUplink) {
         this.uplinkReady = false; // Prevents going back to endpoint[0]
-        clearTimeout(livelinessCheck)
-        selectNextUplink()
+        clearTimeout(livelinessCheck);
+        selectNextUplink();
       } else {
         this.closed = false;
         alive();
       }
 
-      this.connection = connect();
+      connect();
     };
 
     const close = (error?: Error): void => {
@@ -588,7 +631,8 @@ export class XrplClient extends EventEmitter {
       this.closed = true;
 
       try {
-        this.connection.close();
+        log("Close #2");
+        this?.connection?.close();
       } catch (e) {
         //
       }
@@ -628,10 +672,10 @@ export class XrplClient extends EventEmitter {
 
     const WsCleanup = (): void => {
       log("Cleanup");
-      (this.connection as any).removeEventListener("open", WsOpen);
-      (this.connection as any).removeEventListener("message", WsMessage);
-      (this.connection as any).removeEventListener("error", WsError);
-      (this.connection as any).removeEventListener("close", WsClose);
+      (this?.connection as any).removeEventListener("open", WsOpen);
+      (this?.connection as any).removeEventListener("message", WsMessage);
+      (this?.connection as any).removeEventListener("error", WsError);
+      (this?.connection as any).removeEventListener("close", WsClose);
     };
 
     const selectNextUplink = () => {
@@ -647,16 +691,18 @@ export class XrplClient extends EventEmitter {
       if (nextEndpointIndex >= this.endpoints.length) {
         this.emit("round");
       }
-    }
+    };
 
-    const connect = (): WebSocket => {
+    const connect = (): WebSocket | undefined => {
       try {
-        this.connection.close();
+        log("Close #3");
+        WsCleanup();
+        this?.connection?.close();
       } catch (e) {
         //
       }
 
-      log("Connecting", this.endpoint);
+      log("connect()", this.endpoint);
 
       this.serverState.connectAttempts++;
 
@@ -685,7 +731,7 @@ export class XrplClient extends EventEmitter {
           logWarning(
             "Multiple endpoints, max. connection attempts exceeded. Switch endpoint."
           );
-          selectNextUplink()
+          selectNextUplink();
         } else {
           logWarning(
             "Only one valid endpoint, after the max. connection attempts: game over"
@@ -695,37 +741,127 @@ export class XrplClient extends EventEmitter {
       }
 
       if (!this.closed) {
-        const connection = new WebSocket(
-          this.endpoint, // url
-          undefined, // protocols
-          undefined, // origin
-          Object.assign(this.options?.httpHeaders || {}, {
-            "user-agent": "xrpl-client@js/ts",
-          }), // headers
-          this.options?.httpRequestOptions || {}, // requestOptions
-          {
-            maxReceivedFrameSize: 0x80000000, // 2GB
-            maxReceivedMessageSize: 0x200000000, // 8GB
-          } // IClientConfig
-        );
+        if (this.options.tryAllNodes) {
+          logWarning(
+            "!!!".repeat(30) +
+              "\n!!!\n!!!    Trying all nodes. WARNING! IF YOU DO NOT EXPLICITLY NEED THIS,\n!!!    DO NOT USE THE `tryAllNodes` OPTION (to prevent wasting resources)\n!!!\n" +
+              "!!!".repeat(30) +
+              "\n"
+          );
+        }
 
-        // Prevent possible DNS resolve hang, and a custom
-        // resolver sucks
-        setTimeout(() => {
-          if (connection.readyState !== WebSocket.OPEN) {
-            connection.close();
-          }
-        }, reconnectTime() * 1000 - 1);
+        const allEndpoints = (
+          this.options.tryAllNodes ? this.endpoints : [this.endpoint]
+        ).map((endpoint) => {
+          log("Connecting", endpoint);
+          const connection = new WebSocket(
+            endpoint, // url
+            undefined, // protocols
+            undefined, // origin
+            Object.assign(this.options?.httpHeaders || {}, {
+              "user-agent": "xrpl-client@js/ts",
+            }), // headers
+            this.options?.httpRequestOptions || {}, // requestOptions
+            {
+              maxReceivedFrameSize: 0x80000000, // 2GB
+              maxReceivedMessageSize: 0x200000000, // 8GB
+            } // IClientConfig
+          );
 
-        (connection as any).addEventListener("open", WsOpen);
-        (connection as any).addEventListener("message", WsMessage);
-        (connection as any).addEventListener("error", WsError);
-        (connection as any).addEventListener("close", WsClose);
+          // Prevent possible DNS resolve hang, and a custom
+          // resolver sucks
+          setTimeout(() => {
+            if (
+              connection.readyState !== WebSocket.OPEN &&
+              this.connection?.readyState !== WebSocket.OPEN
+            ) {
+              log("Close #4 -- FORCED, inner connection timeout");
+              connection.close();
+              if (!this.options.tryAllNodes) {
+                this.eventBus.emit("reconnect");
+              }
+            }
+          }, reconnectTime() * 1000 - 1);
 
-        this.connection = connection;
+          const raceOpenHandler = () => {
+            log("OPEN", endpoint);
+            connection.send(JSON.stringify({ command: "server_info" }));
+          };
+
+          const raceMessageHandler = (message: IMessageEvent): void => {
+            assert(
+              typeof message.data === "string",
+              "Unexpected incoming WebSocket message data type"
+            );
+
+            const messageJson: CallResponse = JSON.parse(message.data);
+            const handledServerInfo = handleServerInfo(messageJson, true);
+
+            if (handledServerInfo) {
+              const serverState = this.getState(handledServerInfo.serverState);
+              if (
+                typeof serverState.ledger.last === "number" &&
+                (Number(serverState.ledger.count || 0) || 0) > 0
+              ) {
+                // This one is first & sane
+                logNodeInfo("Race won by endpoint:", {
+                  endpoint,
+                  build_version:
+                    handledServerInfo.serverInfo.result.info.build_version,
+                  complete_ledgers:
+                    handledServerInfo.serverInfo.result.info.complete_ledgers,
+                  pubkey_node:
+                    handledServerInfo.serverInfo.result.info.pubkey_node,
+                });
+
+                // this.options.tryAllNodes = false;
+                this.connection = connection;
+                this.endpoint = endpoint;
+
+                WsOpen();
+                WsMessage(message);
+
+                allEndpoints.forEach((iConnection) => {
+                  (iConnection as any).removeEventListener(
+                    "open",
+                    raceOpenHandler
+                  );
+                  (iConnection as any).removeEventListener(
+                    "message",
+                    raceMessageHandler
+                  );
+
+                  if (iConnection != connection) {
+                    log("Close #5");
+                    iConnection.close();
+                    logNodeInfo(
+                      "Cleanup: closing connection & clearing event listeners for lost race connection",
+                      iConnection.url
+                    );
+                  } else {
+                    logNodeInfo(
+                      "Cleanup: cleared event listeners for winning node",
+                      iConnection.url
+                    );
+                  }
+                });
+
+                (connection as any).addEventListener("open", WsOpen);
+                (connection as any).addEventListener("message", WsMessage);
+                (connection as any).addEventListener("error", WsError);
+                (connection as any).addEventListener("close", WsClose);
+              }
+            }
+          };
+
+          (connection as any).addEventListener("open", raceOpenHandler);
+          (connection as any).addEventListener("message", raceMessageHandler);
+
+          return connection;
+        });
       }
 
-      return this.connection;
+      return this?.connection;
     };
 
     this.eventBus.on("__WsClient_call", call);
@@ -735,7 +871,7 @@ export class XrplClient extends EventEmitter {
     this.eventBus.on("flush", flush);
     this.eventBus.on("reconnect", connect);
 
-    this.connection = connect();
+    connect();
   }
 
   ready(): Promise<XrplClient> {
@@ -837,8 +973,12 @@ export class XrplClient extends EventEmitter {
     return promise;
   }
 
-  getState(): ConnectionState {
-    const ledgerCount = this.serverState.validatedLedgers
+  getState(forcedServerState?: ServerState): ConnectionState {
+    const serverState = forcedServerState
+      ? forcedServerState
+      : this.serverState;
+
+    const ledgerCount = serverState.validatedLedgers
       .split(",")
       .map((m: string) => {
         const Range = m.split("-");
@@ -850,20 +990,19 @@ export class XrplClient extends EventEmitter {
       online:
         this.uplinkReady &&
         !this.closed &&
-        this.connection.readyState === WebSocket.OPEN,
+        this?.connection?.readyState === WebSocket.OPEN,
       latencyMs: {
         last:
-          this.serverState.latency
+          serverState.latency
             .slice(-1)
             .map((latencyRecord) => latencyRecord.value)[0] || null,
         avg:
-          this.serverState.latency
+          serverState.latency
             .map((latencyRecord) => latencyRecord.value)
-            .reduce((a, b) => a + b, 0) / this.serverState.latency.length ||
-          null,
+            .reduce((a, b) => a + b, 0) / serverState.latency.length || null,
         secAgo:
           Number(new Date()) / 1000 -
-            this.serverState.latency
+            serverState.latency
               .slice(-1)
               .map((latencyRecord) => Number(latencyRecord.moment) / 1000)[0] ||
           null,
@@ -876,37 +1015,35 @@ export class XrplClient extends EventEmitter {
       },
       ledger: {
         last: Number(
-          this.serverState.validatedLedgers
+          serverState.validatedLedgers
             .split(",")
             .reverse()[0]
             .split("-")
             .reverse()[0]
         ),
-        validated: this.serverState.validatedLedgers,
-        count: this.serverState.validatedLedgers === "" ? 0 : ledgerCount,
+        validated: serverState.validatedLedgers,
+        count: serverState.validatedLedgers === "" ? 0 : ledgerCount,
       },
       fee: {
         last:
-          this.serverState.fee
-            .slice(-1)
-            .map((feeRecord) => feeRecord.value)[0] ||
+          serverState.fee.slice(-1).map((feeRecord) => feeRecord.value)[0] ||
           this.options.feeDropsDefault ||
           feeDropsDefault,
         avg:
-          this.serverState.fee
+          serverState.fee
             .map((feeRecord) => feeRecord.value)
-            .reduce((a, b) => a + b, 0) / this.serverState.fee.length ||
+            .reduce((a, b) => a + b, 0) / serverState.fee.length ||
           this.options.feeDropsDefault ||
           feeDropsDefault,
         secAgo:
           Number(new Date()) / 1000 -
-            this.serverState.fee
+            serverState.fee
               .slice(-1)
               .map((feeRecord) => Number(feeRecord.moment) / 1000)[0] || null,
       },
       reserve: {
-        base: this.serverState.reserveBase,
-        owner: this.serverState.reserveInc,
+        base: serverState.reserveBase,
+        owner: serverState.reserveInc,
       },
       secLastContact: this.lastContact
         ? Number(new Date()) / 1000 - Number(this.lastContact) / 1000

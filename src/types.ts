@@ -56,6 +56,7 @@ export interface WsClientOptions {
   httpRequestOptions?: http.RequestOptions;
   feeDropsDefault?: number;
   feeDropsMax?: number;
+  tryAllNodes?: boolean;
   // maxPendingCalls: number;
 }
 
@@ -82,7 +83,7 @@ export type PseudoId = {
 };
 
 export interface ConnectReinstateOptions {
-  forceNextUplink?: boolean
+  forceNextUplink?: boolean;
 }
 
 export interface CallResponse extends AnyJson {
@@ -102,6 +103,11 @@ export interface PendingCall {
   };
   sendOptions?: SendOptions;
   timeout?: ReturnType<typeof setTimeout>;
+}
+
+export interface serverInfoAndState {
+  serverInfo: ServerInfoResponse;
+  serverState: ServerState;
 }
 
 export interface ServerInfoResponse extends AnyJson {

@@ -39,6 +39,7 @@ Available options are:
 - `connectAttemptTimeoutSeconds`, `Number` » default **3**, this setting is the max. delay between reconnect attempts, if no connection could be setup to the XRPL node. A backoff starting at one second, growing with 20% per attempt until this value is reached will be used.
 - `feeDropsDefault`, `Number` » default **12**, The min. amount of node reported transaction fee (in drops) respected for the `getState()` reported last/avg fee amount.
 - `feeDropsMax`, `Number` » default **3600**, The max. amount of node reported transaction fee (in drops) respected for the `getState()` reported last/avg fee amount.
+- `tryAllNodes`, `Boolean` » default **false**, If connection attempts will be made to all nodes at the same time, connecting the client to the first to respond.
 
 Sample with a custom node & option:
 
@@ -60,7 +61,7 @@ const client = new XrplClient(
 - `ready()` » `Promise<self>` » fires when you're fully connected. While the `state` event (and `getState()` method) only return the WebSocket online state, `ready()` will only return (async) if the first ledger data has been received and the last ledger index is known.
 - `getState()` » `ConnectionState` » Get the connection, connectivity & server state (e.g. fees, reserves).
 - close() » `void` » Close the connection, but allow the object to be used again (using `reinstate()`).
-- reinstate(options?: {forceNextUplink: boolean}) » `void` » Reconnect the object when in closed state (after calling `close()`). By passing `forceNextUplink: true` (default false) the connection will be reinstated to the next uplink instead of starting again from the first provided uplink (constructor).
+- reinstate(options?: {forceNextUplink: boolean}) » `void` » Reconnect the object when in closed state (after calling `close()`). By passing `forceNextUplink: true` (default false) the connection will be reinstated to the next uplink instead of starting again from the first provided uplink (constructor). If the Client class was constructed with the `tryAllNodes: true` option, there is no "next uplink", as all will be tried. In which case the `forceNextUplink: true` option will be ignored.
 - destroy() » `void` » Fully close the entire object (can't be used again).
 
 #### Send options
