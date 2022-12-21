@@ -23,7 +23,6 @@ import {
   ConnectReinstateOptions,
   serverInfoAndState,
 } from "./types";
-import { isContext } from "vm";
 
 export * from "./types";
 
@@ -107,6 +106,7 @@ export class XrplClient extends EventEmitter {
     latency: [],
     fee: [],
     connectAttempts: -1,
+    networkId: 0,
   };
 
   private lastContact?: Date;
@@ -301,6 +301,7 @@ export class XrplClient extends EventEmitter {
           if (!returnOnly) {
             logNodeInfo("Connected, server_info:", {
               pubkey_node: serverInfo.result.info.pubkey_node,
+              network_id: serverInfo.result.info?.network_id || 0,
               build_version: serverInfo.result.info.build_version,
               complete_ledgers: serverInfo.result.info.complete_ledgers,
             });
@@ -322,6 +323,10 @@ export class XrplClient extends EventEmitter {
         if (serverInfo?.result?.info?.complete_ledgers) {
           serverState.validatedLedgers =
             serverInfo.result.info.complete_ledgers;
+        }
+
+        if (serverInfo?.result?.info) {
+          serverState.networkId = serverInfo.result.info.network_id || 0;
         }
 
         const msRoundTrip =
@@ -812,6 +817,8 @@ export class XrplClient extends EventEmitter {
                     handledServerInfo.serverInfo.result.info.complete_ledgers,
                   pubkey_node:
                     handledServerInfo.serverInfo.result.info.pubkey_node,
+                  network_id:
+                    handledServerInfo.serverInfo.result.info?.network_id || 0,
                 });
 
                 // this.options.tryAllNodes = false;
@@ -1011,6 +1018,7 @@ export class XrplClient extends EventEmitter {
         version: this.serverInfo?.result?.info?.build_version || "",
         uptime: this.serverInfo?.result?.info?.uptime || 0,
         publicKey: this.serverInfo?.result?.info?.pubkey_node || "",
+        networkId: this.serverInfo?.result?.info?.network_id || 0,
         uri: this.endpoint,
       },
       ledger: {

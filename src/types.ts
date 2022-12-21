@@ -117,6 +117,7 @@ export interface ServerInfoResponse extends AnyJson {
       build_version: string;
       complete_ledgers: string;
       hostid: string;
+      network_id?: number;
       io_latency_ms: number;
       jq_trans_overflow: string;
       last_close: AnyJson;
@@ -148,6 +149,7 @@ export type ServerState = {
   fee: ServerStateStatistic[];
   latency: ServerStateStatistic[];
   connectAttempts: number;
+  networkId: number;
 };
 
 export interface ConnectionState {
@@ -162,6 +164,7 @@ export interface ConnectionState {
     uptime: number;
     publicKey: string;
     uri: string;
+    networkId: number;
   };
   ledger: {
     last: number;
