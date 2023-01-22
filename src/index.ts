@@ -782,7 +782,18 @@ export class XrplClient extends EventEmitter {
             ) {
               log("Close #4 -- FORCED, inner connection timeout");
               connection.close();
-              if (!this.options.tryAllNodes) {
+              if (this.options.tryAllNodes) {
+                /**
+                 * Just do this once per X interval, instead of per connection.
+                 * We don't want all simultaneous connections to fire this and
+                 * kick off a fork (connection) bomb, so assuming they all
+                 * got tried if we're here, only fire reconnet for the very first
+                 * endpoint (as it'll make them all reconnect).
+                 */
+                if (this.endpoints.indexOf(endpoint) === 0) {
+                  this.eventBus.emit("reconnect");
+                }
+              } else {
                 this.eventBus.emit("reconnect");
               }
             }
