@@ -6,6 +6,7 @@
     "declaration": true,
     "outDir": "./dist",
     "strict": true,
+    "rootDir": "./",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "typeRoots": ["./node_modules/@types", "./@types"]

@@ -522,8 +522,8 @@ export class XrplClient extends EventEmitter {
           // Subscription/path finding followup
           handleAsyncWsMessage(messageJson);
         }
-      } catch (e) {
-        logWarning("Uplink response: parse error", e.message);
+      } catch (e: unknown) {
+        logWarning("Uplink response: parse error", (e as Error).message);
       }
     };
 
@@ -568,8 +568,8 @@ export class XrplClient extends EventEmitter {
           // logWarning("APPLY TIMEOUT ONLY AFTER GOING ONLINE");
           applyCallTimeout(call);
         }
-      } catch (e) {
-        logWarning("Process (send to uplink) error", e.message);
+      } catch (e: unknown) {
+        logWarning("Process (send to uplink) error", (e as Error).message);
       }
     };
 
@@ -912,7 +912,7 @@ export class XrplClient extends EventEmitter {
     });
   }
 
-  send(call: Call, sendOptions: SendOptions = {}): Promise<AnyJson> {
+  async send(call: Call, sendOptions: SendOptions = {}): Promise<AnyJson> {
     assert(
       typeof call === "object" && call,
       "`send()`: expecting object containing `command`"
@@ -986,7 +986,7 @@ export class XrplClient extends EventEmitter {
       this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
     }
 
-    this.eventBus.emit("__WsClient_call", pendingCall);
+    this.eventBus.emit("__WsClient_call", pendingCall);  
 
     return promise;
   }

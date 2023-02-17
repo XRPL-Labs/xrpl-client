@@ -34,7 +34,7 @@
     "@types/websocket": "^1.0.2",
     "@typescript-eslint/eslint-plugin": "^4.25.0",
     "@typescript-eslint/parser": "^4.25.0",
-    "browserify": "^16.5.2",
+    "browserify": "^17.0.0",
     "eslint": "^7.27.0",
     "jest": "^26.4.2",
     "terser": "^5.3.4",
