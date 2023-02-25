@@ -932,7 +932,8 @@ export class XrplClient extends EventEmitter {
 
     const pendingCall: PendingCall = {
       id: this.callId,
-      request: Object.assign(call, {
+      request: Object.assign({}, {
+        ...call,
         id: {
           _WsClient: this.callId,
           _Request: call?.id,
