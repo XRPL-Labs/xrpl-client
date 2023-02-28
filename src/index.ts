@@ -913,11 +913,13 @@ export class XrplClient extends EventEmitter {
   }
 
   async send(call: Call, sendOptions: SendOptions = {}): Promise<AnyJson> {
+    const _call = Object.assign({}, call)
+
     assert(
-      typeof call === "object" && call,
+      typeof _call === "object" && _call,
       "`send()`: expecting object containing `command`"
     );
-    assert(typeof call.command === "string", "`command` must be typeof string");
+    assert(typeof _call.command === "string", "`command` must be typeof string");
 
     this.callId++;
 
@@ -932,13 +934,12 @@ export class XrplClient extends EventEmitter {
 
     const pendingCall: PendingCall = {
       id: this.callId,
-      request: Object.assign({}, {
-        ...call,
+      request: Object.assign(_call, {
         id: {
           _WsClient: this.callId,
-          _Request: call?.id,
+          _Request: _call?.id,
         },
-        command: call.command.toLowerCase().trim(),
+        command: _call.command.toLowerCase().trim(),
       }),
       promise,
       promiseCallables,
@@ -982,7 +983,7 @@ export class XrplClient extends EventEmitter {
     }
 
     if (
-      String(call?.id || "").split("@")[0] !== "_WsClient_Internal_ServerInfo"
+      String(_call?.id || "").split("@")[0] !== "_WsClient_Internal_ServerInfo"
     ) {
       this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
     }
