@@ -1,5 +1,7 @@
 # XRPL WebSocket Client [![npm version](https://badge.fury.io/js/xrpl-client.svg)](https://www.npmjs.com/xrpl-client) [![GitHub Actions NodeJS status](https://github.com/XRPL-Labs/xrpl-client/workflows/NodeJS/badge.svg?branch=main)](https://github.com/XRPL-Labs/xrpl-client/actions) [![CDNJS Browserified](https://img.shields.io/badge/cdnjs-browserified-blue)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) [![CDNJS Browserified Minified](https://img.shields.io/badge/cdnjs-minified-orange)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js)
 
+## 🚨 ⚠️ ☢️ WARNING! 🚨 DANGER! If you are using `xrpl-client` in a serverless environment, make sure to `.close()` your connection at the end, to prevent your connection to linger on for a long time (causing massive load on public infrastructure, and massive serverless function invocation time bills from your cloud provider!)
+
 ### XRP Ledger WebSocket Client, npm: `xrpl-client`
 
 Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket client. For in node & the browser.
