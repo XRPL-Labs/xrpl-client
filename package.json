@@ -21,7 +21,8 @@
     "dist/src/**/*.js",
     "dist/src/**/*.d.ts",
     "dist/browser.js",
-    "dist/browser.min.js"
+    "dist/browser.min.js",
+    "README.md"
   ],
   "dependencies": {
     "debug": "^4.1.1",
