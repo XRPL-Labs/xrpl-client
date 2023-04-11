@@ -759,6 +759,16 @@ export class XrplClient extends EventEmitter {
           this.options.tryAllNodes ? this.endpoints : [this.endpoint]
         ).map((endpoint) => {
           log("Connecting", endpoint);
+          /**
+           * Alternative WebSocket implementation here for Bun:
+           * Postprocessed in npm build cli
+           */
+          // WEBSOCKET //let WssClient = typeof WebSocket !== 'undefined' ? WebSocket : websocket_1.w3cwebsocket
+          // WEBSOCKET //if (typeof require !== 'undefined') {
+          // WEBSOCKET //  try {
+          // WEBSOCKET //    WssClient = require('ws').default
+          // WEBSOCKET //  } catch (e) {}
+          // WEBSOCKET //}
           const connection = new WebSocket(
             endpoint, // url
             undefined, // protocols
