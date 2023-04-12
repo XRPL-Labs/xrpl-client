@@ -13,7 +13,7 @@
     "inspect": "clear && npm run build && node --inspect dist/samples/sample.js",
     "browserify": "browserify -r ./dist/src/index.js:xrpl-client -o dist/browser.js && npm run minify",
     "minify": "cat dist/browser.js | terser --compress --mangle > dist/browser.min.js",
-    "test": "DEBUG=xrplclient:tests* jest --ci",
+    "test": "DEBUG=xrplclient:tests* jest --ci --detectOpenHandles",
     "test-verbose": "DEBUG=xrplclient:tests* jest --ci --verbose",
     "lint": "eslint"
   },
