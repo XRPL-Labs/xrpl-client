@@ -97,6 +97,8 @@ export class XrplClient extends EventEmitter {
   private pendingCalls: PendingCall[] = [];
   private subscriptions: PendingCall[] = [];
 
+  private networkDefinitions: AnyJson | null = null;
+
   private clusterInfo_?: ClusterInfo;
   private serverInfo?: ServerInfoResponse;
   private serverState: ServerState = {
@@ -922,14 +924,47 @@ export class XrplClient extends EventEmitter {
     });
   }
 
+  async definitions(): Promise<AnyJson | null> {
+    // null if not checked before
+    if (this.networkDefinitions === null) {
+      await this.ready();
+      const definitions = await this.send({ command: "server_definitions" });
+
+      if (typeof definitions?.FIELDS === "object") {
+        this.networkDefinitions = definitions;
+        return this.networkDefinitions;
+      }
+
+      // Error, no definitions command, fallback to defaults
+      if (
+        (typeof definitions?.status === "string" &&
+          definitions.status.match(/error/i)) ||
+        (typeof definitions?.error === "string" &&
+          definitions.error.match(/unknown/i))
+      ) {
+        this.networkDefinitions = {};
+      }
+    }
+
+    // return null if {} (empty object) to fall back to defaults;
+    // null internally (property) means unfetched, null externally
+    // means fall back to defaults.
+    return typeof this.networkDefinitions?.FIELDS === "object"
+      ? this.networkDefinitions
+      : null;
+  }
+
   async send(call: Call, sendOptions: SendOptions = {}): Promise<AnyJson> {
-    const _call = Object.assign({}, call)
+    const _call = Object.assign({}, call);
 
     assert(
       typeof _call === "object" && _call,
       "`send()`: expecting object containing `command`"
     );
-    assert(typeof _call.command === "string", "`command` must be typeof string");
+    assert(
+      typeof _call.command === "string",
+      "`command` must be typeof string"
+    );
 
     this.callId++;
 
@@ -998,7 +1033,7 @@ export class XrplClient extends EventEmitter {
       this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
     }
 
-    this.eventBus.emit("__WsClient_call", pendingCall);  
+    this.eventBus.emit("__WsClient_call", pendingCall);
 
     return promise;
   }
