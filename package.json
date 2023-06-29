@@ -1,6 +1,6 @@
 {
   "name": "xrpl-client",
-  "version": "2.0.11",
+  "version": "2.1.0",
   "description": "Connect to the XRP Ledger using WebSockets",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
