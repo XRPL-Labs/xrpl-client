@@ -5,7 +5,7 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "prepare": "npm run clean && npm run lint && npm run test && npm run build && npm run browserify",
+    "prepare": "npm run clean && npm run lint && npm run build && npm run test && npm run browserify",
     "clean": "rm -rf dist",
     "build": "tsc && cat dist/src/index.js | sed 's/\\/\\/ WEBSOCKET \\/\\///g' | sed 's/new websocket_1.w3cwebsocket/new (typeof WssClient !== typeof _NA_ ? WssClient : websocket_1.w3cwebsocket)/g'|tee dist/src/index.js | echo $(wc -l)' lines written'",
     "watch": "tsc -w",

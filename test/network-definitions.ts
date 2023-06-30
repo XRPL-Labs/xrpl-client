@@ -1,5 +1,7 @@
 import { XrplClient } from "../dist/src/index.js";
 
+jest.setTimeout(30 * 1000);
+
 describe("Network specific", () => {
   describe("Handle network definitions", () => {
     const networkWithDefinitions = "wss://hooks-testnet-v3.xrpl-labs.com";

@@ -1,5 +1,7 @@
 import { XrplClient } from "../dist/src/index.js";
 
+jest.setTimeout(30 * 1000);
+
 let client: XrplClient;
 
 describe("Common", () => {
