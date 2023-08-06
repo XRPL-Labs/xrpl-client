@@ -40,6 +40,12 @@ const feeDropsDefault = 12;
 const feeDropsMax = 3600;
 const tryAllNodes = false;
 
+export const defaultEndpoints = [
+  "wss://xrplcluster.com",
+  "wss://xrpl.link",
+  "wss://s2.ripple.com",
+]
+
 export declare interface XrplClient {
   on<U extends keyof XrplClientEvents>(
     event: U,
@@ -59,11 +65,7 @@ const endpointParser = (endpoint?: string | string[]): string[] => {
   }
 
   if (endpoints.length < 1) {
-    endpoints = [
-      "wss://xrplcluster.com",
-      "wss://xrpl.link",
-      "wss://s2.ripple.com",
-    ];
+    endpoints = defaultEndpoints;
     logWarning(
       "No valid WebSocket endpoint(s) specified, falling back to defaults",
       endpoints
