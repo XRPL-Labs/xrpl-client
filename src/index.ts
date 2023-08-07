@@ -23,6 +23,7 @@ import {
   ConnectReinstateOptions,
   serverInfoAndState,
 } from "./types";
+import addSubscription from "./util";
 
 export * from "./types";
 
@@ -1030,7 +1031,11 @@ export class XrplClient extends EventEmitter {
     if (
       String(_call?.id || "").split("@")[0] !== "_WsClient_Internal_ServerInfo"
     ) {
-      this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
+      if (isSubscription) console.log("adding subscription to", JSON.stringify(this.subscriptions));
+      // addSubscription
+      (isSubscription) ? addSubscription(this.subscriptions, pendingCall) : this.pendingCalls.push(pendingCall);
+      // this[isSubscription ? "subscriptions" : "pendingCalls"].push(pendingCall);
+      if (isSubscription) console.log("quedamos asi", JSON.stringify(this.subscriptions));
     }
 
     this.eventBus.emit("__WsClient_call", pendingCall);
