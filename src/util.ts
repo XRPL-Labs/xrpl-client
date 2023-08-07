@@ -8,7 +8,7 @@ export default function addSubscription(subscriptions: PendingCall[], pendingCal
     const find = subscriptions.findIndex(({ request }) => request.command == "path_find");
     if (find > -1) subscriptions.splice(find, 1);
   };
-  if (pendingCall.request.command !== "path_find" || (pendingCall.request.command === "path_find" && pendingCall.request.subcommand !== "status"))
+  if (pendingCall.request.command !== "path_find" || (pendingCall.request.command === "path_find" && pendingCall.request.subcommand === "create"))
     subscriptions.push(pendingCall)
   return subscriptions;
 }
