@@ -976,7 +976,17 @@ export class XrplClient extends EventEmitter {
     };
 
     const promise = new Promise<AnyJson>((resolve, reject): void => {
-      Object.assign(promiseCallables, { resolve, reject });
+      Object.assign(promiseCallables, { 
+        resolve: (arg: AnyJson) => {
+          Object.defineProperty(arg, 'id', {
+            enumerable: false,
+            writable: false,
+            value: call?.id,
+          })
+          return resolve(arg)
+        },
+        reject,
+      });
     });
 
     const pendingCall: PendingCall = {
