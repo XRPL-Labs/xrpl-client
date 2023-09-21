@@ -681,10 +681,10 @@ export class XrplClient extends EventEmitter {
 
     const WsCleanup = (): void => {
       log("Cleanup");
-      (this?.connection as any).removeEventListener("open", WsOpen);
-      (this?.connection as any).removeEventListener("message", WsMessage);
-      (this?.connection as any).removeEventListener("error", WsError);
-      (this?.connection as any).removeEventListener("close", WsClose);
+      (this?.connection as any)?.removeEventListener("open", WsOpen);
+      (this?.connection as any)?.removeEventListener("message", WsMessage);
+      (this?.connection as any)?.removeEventListener("error", WsError);
+      (this?.connection as any)?.removeEventListener("close", WsClose);
     };
 
     const selectNextUplink = () => {
@@ -854,11 +854,11 @@ export class XrplClient extends EventEmitter {
                 WsMessage(message);
 
                 allEndpoints.forEach((iConnection) => {
-                  (iConnection as any).removeEventListener(
+                  (iConnection as any)?.removeEventListener(
                     "open",
                     raceOpenHandler
                   );
-                  (iConnection as any).removeEventListener(
+                  (iConnection as any)?.removeEventListener(
                     "message",
                     raceMessageHandler
                   );
@@ -878,16 +878,20 @@ export class XrplClient extends EventEmitter {
                   }
                 });
 
-                (connection as any).addEventListener("open", WsOpen);
-                (connection as any).addEventListener("message", WsMessage);
-                (connection as any).addEventListener("error", WsError);
-                (connection as any).addEventListener("close", WsClose);
+                if (!this.destroyed) {
+                  (connection as any)?.addEventListener("open", WsOpen);
+                  (connection as any)?.addEventListener("message", WsMessage);
+                  (connection as any)?.addEventListener("error", WsError);
+                  (connection as any)?.addEventListener("close", WsClose);
+                }
               }
             }
           };
 
-          (connection as any).addEventListener("open", raceOpenHandler);
-          (connection as any).addEventListener("message", raceMessageHandler);
+          if (!this.destroyed) {
+            (connection as any)?.addEventListener("open", raceOpenHandler);
+            (connection as any)?.addEventListener("message", raceMessageHandler);
+          }
 
           return connection;
         });
