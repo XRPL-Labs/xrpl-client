@@ -775,7 +775,7 @@ export class XrplClient extends EventEmitter {
           // WEBSOCKET //}
           const connection = new WebSocket(
             endpoint, // url
-            undefined, // protocols
+            [], // protocols - must be array instead of undefined to make Chrome+Caddy work
             undefined, // origin
             Object.assign(this.options?.httpHeaders || {}, {
               "user-agent": "xrpl-client@js/ts",
