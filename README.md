@@ -1,12 +1,26 @@
-# XRPL WebSocket Client [![npm version](https://badge.fury.io/js/xrpl-client.svg)](https://www.npmjs.com/xrpl-client) [![GitHub Actions NodeJS status](https://github.com/XRPL-Labs/xrpl-client/workflows/NodeJS/badge.svg?branch=main)](https://github.com/XRPL-Labs/xrpl-client/actions) [![CDNJS Browserified](https://img.shields.io/badge/cdnjs-browserified-blue)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) [![CDNJS Browserified Minified](https://img.shields.io/badge/cdnjs-minified-orange)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js)
+# XRPL WebSocket Client [![npm version](https://badge.fury.io/js/xrpl-client.svg)](https://www.npmjs.com/xrpl-client) [![GitHub Actions NodeJS status](https://github.com/XRPL-Labs/xrpl-client/workflows/NodeJS/badge.svg?branch=main)](https://github.com/XRPL-Labs/xrpl-client/actions) 
 
-## 🚨 ⚠️ ☢️ WARNING! 🚨 DANGER! If you are using `xrpl-client` in a serverless environment, make sure to `.close()` your connection at the end, to prevent your connection to linger on for a long time (causing massive load on public infrastructure, and massive serverless function invocation time bills from your cloud provider!)
+## 🚨 WARNING! 🚨 If you are using `xrpl-client` in a serverless environment, make sure to `.close()` your connection at the end, to prevent your connection to linger on for a long time (causing massive load on public infrastructure, and massive serverless function invocation time bills from your cloud provider!)
 
 ### XRP Ledger WebSocket Client, npm: `xrpl-client`
 
 Auto reconnecting, buffering, subscription remembering XRP Ledger WebSocket client. For in node & the browser.
 
 This client implements a check for a working XRPL connection: the WebSocket being simply online isn't enough to satisfy the online / offline detection of this lib. After connecting, this lib. will issue a `server_info` command to the other connected node. Only if a valid response is retrieved the connection will be marked as online.
+
+### Use in the browser
+
+You can clone this repository and run:
+
+- `npm run install` to install dependencies
+- `npm run build` to build the source code
+- `npm run browserify` to browserify this lib.
+
+Now the `dist/browser.js` file will exist, for you to use in a browser.
+
+You can get a [prebuilt](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) / [prebuilt & minified](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js) version from Github / CDNJS [![CDNJS Browserified](https://img.shields.io/badge/cdnjs-browserified-blue)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) [![CDNJS Browserified Minified](https://img.shields.io/badge/cdnjs-minified-orange)](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js)
+
+Sample: [https://jsfiddle.net/WietseWind/p4cd37hf](https://jsfiddle.net/WietseWind/p4cd37hf/)
 
 ### A note on connectivity vs. signing
 
@@ -121,20 +135,6 @@ client.on("ledger", (ledger) => {
   console.log("Ledger", ledger);
 });
 ```
-
-### Use in the browser
-
-You can clone this repository and run:
-
-- `npm run install` to install dependencies
-- `npm run build` to build the source code
-- `npm run browserify` to browserify this lib.
-
-Now the `dist/browser.js` file will exist, for you to use in a browser.
-
-Alternatively you can get a [prebuilt](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.js) / [prebuilt & minified](https://cdn.jsdelivr.net/npm/xrpl-client/dist/browser.min.js) version from Github.
-
-Sample: [https://jsfiddle.net/WietseWind/p4cd37hf](https://jsfiddle.net/WietseWind/p4cd37hf/)
 
 ### Migrating from `rippled-ws-client`
 
