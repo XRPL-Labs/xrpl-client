@@ -13,7 +13,7 @@ describe("Network specific", () => {
         const client = new XrplClient(networkWithDefinitions);
         await client.ready();
         const definitions = await client.definitions();
-        await client.close();
+        client.close();
         return expect(typeof definitions?.FIELDS).toEqual("object");
       }
     );
@@ -24,7 +24,7 @@ describe("Network specific", () => {
         const client = new XrplClient(networkWithoutDefinitions);
         await client.ready();
         const definitions = await client.definitions();
-        await client.close();
+        client.close();
         return expect(definitions).toEqual(null);
       }
     );
