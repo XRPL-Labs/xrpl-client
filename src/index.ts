@@ -115,6 +115,11 @@ export class XrplClient extends EventEmitter {
 
   private lastContact?: Date;
 
+  /**
+   * Ledger ready interval check for manual ledger close mode
+   */
+  private manualLedgerCloseReadyInterval?: ReturnType<typeof setInterval>;
+
   constructor(endpoint?: string | string[], options?: WsClientOptions) {
     super();
 
@@ -260,6 +265,8 @@ export class XrplClient extends EventEmitter {
     };
 
     const WsClose = (event: ICloseEvent): void => {
+      clearInterval(this.manualLedgerCloseReadyInterval);
+
       this.emit("close");
       this.emit("state", this.getState());
 
@@ -926,6 +933,22 @@ export class XrplClient extends EventEmitter {
         this.on("ledger", () => {
           resolve(this);
         });
+
+        // In case ledgers are closed manually and the above
+        // event is not emitted:
+        //   - @ https://github.com/XRPL-Labs/xrpl-client/issues/18
+        this.manualLedgerCloseReadyInterval = setInterval(() => {
+          const state = this.getState();
+          if (
+            state.online &&
+            state.secLastContact &&
+            state.secLastContact < 10 &&
+            state.ledger.last
+          ) {
+            clearInterval(this.manualLedgerCloseReadyInterval);
+            resolve(this);
+          }
+        }, 200)
       }
     });
   }
