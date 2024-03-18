@@ -18,15 +18,16 @@ describe("Network specific", () => {
       }
     );
 
-    it(
-      "should work [ WITHOUT ] definitions @ " + networkWithoutDefinitions,
-      async () => {
-        const client = new XrplClient(networkWithoutDefinitions);
-        await client.ready();
-        const definitions = await client.definitions();
-        await client.close();
-        return expect(definitions).toEqual(null);
-      }
-    );
+    // Disabled, s2 now also returns definitions
+    // it(
+    //   "should work [ WITHOUT ] definitions @ " + networkWithoutDefinitions,
+    //   async () => {
+    //     const client = new XrplClient(networkWithoutDefinitions);
+    //     await client.ready();
+    //     const definitions = await client.definitions();
+    //     await client.close();
+    //     return expect(definitions).toEqual(null);
+    //   }
+    // );
   });
 });
